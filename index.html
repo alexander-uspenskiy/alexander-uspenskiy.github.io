@@ -84,19 +84,23 @@
 											/* General styling for images in the div */
 											.banner-container {
 												display: flex;
-												justify-content: space-between;
+												justify-content: center; /* Center the images by default */
 												align-items: center;
-												flex-wrap: wrap; /* Ensures the images don't overflow */
+												flex-wrap: wrap; /* Wrap images when necessary on smaller screens */
+												gap: 10px; /* Adds space between the images */
 											}
 										
 											.banner-container img {
 												width: 150px;
 												height: 150px;
-												margin: 10px; /* Adds space between the images */
 											}
 										
 											/* Responsive design for small screens */
 											@media screen and (max-width: 768px) {
+												.banner-container {
+													justify-content: space-around; /* Distribute the images evenly */
+												}
+										
 												.banner-container img {
 													width: 120px;
 													height: 120px; /* Reduce size for tablets */
@@ -105,12 +109,17 @@
 										
 											/* Further reduce size for very small screens like phones */
 											@media screen and (max-width: 480px) {
+												.banner-container {
+													justify-content: space-evenly; /* Ensure images are well-distributed */
+												}
+										
 												.banner-container img {
 													width: 100px;
 													height: 100px; /* Reduce size for phones */
 												}
 											}
 										</style>
+										
 										
 										<!-- HTML Structure -->
 										<div class="banner-container">
@@ -126,10 +135,11 @@
 											<div>
 												<img src="images/Azure.png" alt="Azure">
 											</div>
-											<div></div>
+											<div>
 												<img src="images/csm.png" alt="CSM">
 											</div>
 										</div>
+										
 										
 										
 										
