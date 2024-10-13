@@ -84,10 +84,17 @@
 											/* General styling for images in the div */
 											.banner-container {
 												display: flex;
-												justify-content: center; /* Center the images by default */
-												align-items: center;
-												flex-wrap: wrap; /* Wrap images when necessary on smaller screens */
+												justify-content: space-around; /* Ensure even distribution of images */
+												align-items: flex-start; /* Aligns the images vertically at the top */
+												flex-wrap: wrap; /* Wrap the images when necessary */
 												gap: 10px; /* Adds space between the images */
+											}
+										
+											.banner-container div {
+												display: flex; 
+												justify-content: center; 
+												align-items: center; 
+												flex-basis: 150px; /* Ensures each image block takes equal space */
 											}
 										
 											.banner-container img {
@@ -98,7 +105,8 @@
 											/* Responsive design for small screens */
 											@media screen and (max-width: 768px) {
 												.banner-container {
-													justify-content: space-around; /* Distribute the images evenly */
+													justify-content: space-evenly; /* Distribute images evenly on smaller screens */
+													align-items: flex-start; /* Aligns images vertically at the top */
 												}
 										
 												.banner-container img {
@@ -110,7 +118,8 @@
 											/* Further reduce size for very small screens like phones */
 											@media screen and (max-width: 480px) {
 												.banner-container {
-													justify-content: space-evenly; /* Ensure images are well-distributed */
+													justify-content: space-evenly; /* Ensure images are well distributed */
+													align-items: flex-start; /* Align images vertically on small screens */
 												}
 										
 												.banner-container img {
@@ -121,7 +130,7 @@
 										</style>
 										
 										
-										<!-- HTML Structure -->
+										
 										<div class="banner-container">
 											<div>
 												<img src="images/AWS_Pract.png" alt="AWS Certified Practitioner banner">
@@ -139,6 +148,7 @@
 												<img src="images/csm.png" alt="CSM">
 											</div>
 										</div>
+										
 										
 										
 										
