@@ -82,46 +82,49 @@
 										</table>
 										<style>
 											/* General styling for images in the div */
+											.banner-container {
+												display: flex;
+												justify-content: space-between;
+												align-items: center;
+												flex-wrap: wrap; /* Ensures the images don't overflow */
+											}
+										
 											.banner-container img {
 												width: 150px;
 												height: 150px;
+												margin: 10px; /* Adds space between the images */
 											}
 										
-											/* Responsive design for mobile screens */
+											/* Responsive design for small screens */
 											@media screen and (max-width: 768px) {
-												.banner-container {
-													display: flex;
-													flex-direction: column;
-													align-items: center;
-												}
 												.banner-container img {
-													width: 100px;
-													height: 100px; /* Reduce size for mobile */
-													margin-bottom: 20px;
+													width: 120px;
+													height: 120px; /* Reduce size for tablets */
 												}
 											}
 										
-											/* For very small screens, like phones */
+											/* Further reduce size for very small screens like phones */
 											@media screen and (max-width: 480px) {
 												.banner-container img {
-													width: 80px;
-													height: 80px; /* Further reduce size */
+													width: 100px;
+													height: 100px; /* Reduce size for phones */
 												}
 											}
 										</style>
 										
 										<!-- HTML Structure -->
-										<div class="banner-container" style="display: flex; justify-content: space-between; align-items: center;">
-											<div style="text-align: left;">
+										<div class="banner-container">
+											<div>
 												<img src="images/AWS_Pract.png" alt="AWS Certified Practitioner banner">
 											</div>
-											<div style="text-align: center;">
+											<div>
 												<img src="images/solution_archtect.png" alt="AWS Certified Architect banner">
 											</div>
-											<div style="text-align: right;">
+											<div>
 												<img src="images/Safe_bage_300px.png" alt="SAFe">
 											</div>
 										</div>
+										
 										
 										
 								</div>
