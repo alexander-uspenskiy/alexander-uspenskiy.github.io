@@ -1,0 +1,54 @@
+# Logs and temporary files
+*.log
+*.tmp
+*.swp
+*.swo
+*.DS_Store
+Thumbs.db
+
+# Node.js dependencies (if using npm/yarn)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build output (if using build tools)
+dist/
+build/
+.cache/
+out/
+.tmp/
+public/
+
+# Environment variables (security-sensitive files)
+.env
+.env.*
+.secret
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDEs and Editors
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+
+# Sass/CSS Cache
+.sass-cache/
+*.css.map
+*.scssc
+
+# Generated files (e.g., minified JavaScript or transpiled code)
+*.min.js
+*.map
+
+# Temporary uploads
+uploads/
+temp/
+
+# Git-specific files
+.git/
+.gitignore~
