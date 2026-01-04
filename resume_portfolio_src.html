@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alexander Uspenskiy - Resume & Portfolio</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #2563eb;
+            --text-dark: #1e293b;
+            --text-light: #64748b;
+            --bg-light: #f8fafc;
+            --border: #e2e8f0;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            color: var(--text-dark);
+            line-height: 1.5;
+            background: #fff;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px;
+        }
+
+        header {
+            border-bottom: 2px solid var(--primary);
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+        }
+
+        header h1 {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 5px;
+        }
+
+        header p {
+            color: var(--text-light);
+            font-size: 14px;
+        }
+
+        .contact-info {
+            text-align: right;
+            font-size: 13px;
+            color: var(--text-light);
+        }
+
+        .contact-info a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+
+        section {
+            margin-bottom: 30px;
+        }
+
+        h2 {
+            font-size: 18px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--primary);
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 5px;
+            margin-bottom: 15px;
+        }
+
+        .experience-item {
+            margin-bottom: 20px;
+        }
+
+        .experience-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 5px;
+        }
+
+        .experience-header h3 {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .experience-header .company {
+            font-weight: 400;
+            color: var(--text-light);
+            margin-left: 5px;
+        }
+
+        .experience-header .date {
+            font-size: 13px;
+            color: var(--text-light);
+        }
+
+        ul {
+            list-style-type: none;
+            padding-left: 0;
+        }
+
+        .bullets li {
+            position: relative;
+            padding-left: 20px;
+            font-size: 14px;
+            margin-bottom: 5px;
+        }
+
+        .bullets li::before {
+            content: "•";
+            position: absolute;
+            left: 0;
+            color: var(--primary);
+            font-weight: bold;
+        }
+
+        .skills-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+
+        .skill-category {
+            font-size: 14px;
+        }
+
+        .skill-category span {
+            font-weight: 600;
+        }
+
+        .project-item {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 25px;
+            page-break-inside: avoid;
+        }
+
+        .project-content h4 {
+            font-size: 15px;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .project-content p {
+            font-size: 14px;
+            color: var(--text-dark);
+        }
+
+        @media print {
+            body {
+                background: none;
+            }
+
+            .container {
+                padding: 20px;
+                max-width: 100%;
+            }
+
+            .no-print {
+                display: none;
+            }
+
+            header {
+                margin-bottom: 20px;
+            }
+
+            section {
+                margin-bottom: 20px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <div>
+                <h1>Alexander Uspenskiy, PhD</h1>
+                <p>AI Programs | Solutions Architect | 3x Cloud Certified (AWS, Azure)</p>
+            </div>
+            <div class="contact-info">
+                +1 469 638 2819 | <a href="mailto:alexander.uspensky@gmail.com">alexander.uspensky@gmail.com</a><br>
+                <a href="https://linkedin.com/in/uspensky">linkedin.com/in/uspensky</a> | Addison, Texas
+            </div>
+        </header>
+
+        <section id="summary">
+            <h2>Professional Summary</h2>
+            <p style="font-size: 14px;">Proven IT leader with a track record of driving successful large-scale projects
+                in AI Adoption, e-commerce, ERP, and digital transformation. Expert in AI SDLC optimization (GitHub
+                Copilot, AI Agents) and cloud-native architecture. 3x Cloud Certified (AWS Solutions Architect, Azure).
+                Skilled in managing $10M-$100M budgets and leading teams of 120+ people.</p> section
+        </section>
+
+        <section id="experience">
+            <h2>Professional Experience</h2>
+
+            <div class="experience-item">
+                <div class="experience-header">
+                    <h3>Delivery Manager - AI Programs <span class="company">| EPAM Systems</span></h3>
+                    <span class="date">Feb 2025 – Present</span>
+                </div>
+                <ul class="bullets">
+                    <li><b>AI SDLC Optimization:</b> Directed "AI Run" services rollout, achieving a 28% reduction in
+                        lead time and 65% reduction in unit test development time.</li>
+                    <li><b>AI Agents Deployment:</b> Deployed AI Agents for BA, QA, and Dev, resulting in a 20-35%
+                        performance growth across these functions.</li>
+                    <li><b>Productivity Frameworks:</b> Developed AI Productivity metrics dashboards using Jira, GitHub,
+                        and Azure DevOps to optimize delivery efficiency.</li>
+                    <li><b>Model Fine-Tuning:</b> Customizing LLMs and Stable Diffusion models for project-specific
+                        requirements, reducing inference time by 20%.</li>
+                </ul>
+            </div>
+
+            <div class="experience-item">
+                <div class="experience-header">
+                    <h3>Independent Contractor - AI & Ecom <span class="company">| Hesperis.ai</span></h3>
+                    <span class="date">May 2024 – Feb 2025</span>
+                </div>
+                <ul class="bullets">
+                    <li>Led strategic Agile initiatives and AI adoption for eCommerce projects, resulting in a 20%
+                        reduction in delivery time.</li>
+                    <li>Orchestrated cloud implementation strategies and guided development teams in adopting best Agile
+                        practices for cloud-native solutions.</li>
+                </ul>
+            </div>
+
+            <div class="experience-item">
+                <div class="experience-header">
+                    <h3>Sr Mobile Eng Manager / AI Architect <span class="company">| Levi Strauss & Co.</span></h3>
+                    <span class="date">Oct 2022 – May 2024</span>
+                </div>
+                <ul class="bullets">
+                    <li><b>Global Mobile Delivery:</b> Managed 30+ person team for US/CA and Europe. Reduced app load
+                        time from 9s to 2s.</li>
+                    <li><b>React Native Modernization:</b> Led initiatives for Mobile Front End Architecture, including
+                        React Native New Architecture rollout.</li>
+                    <li><b>Growth:</b> Increased loyalty membership acquisition to 5.4M+ users by optimizing backend
+                        integration architecture.</li>
+                </ul>
+            </div>
+
+            <div class="experience-item">
+                <div class="experience-header">
+                    <h3>Director of Information Technology <span class="company">| Levi Strauss & Co.</span></h3>
+                    <span class="date">Oct 2019 – Sep 2022</span>
+                </div>
+                <ul class="bullets">
+                    <li>Led Digital Transformation in Europe; managed full IT Portfolio and SAP ERP implementation.</li>
+                    <li>Relaunched award-winning eCommerce platform ru.levi.com; +470% orders growth, +247% conversion
+                        rate.</li>
+                </ul>
+            </div>
+        </section>
+
+        <section id="education">
+            <h2>Education</h2>
+            <div class="experience-header">
+                <h3>Bauman Moscow State Technical University</h3>
+                <span class="date">2000 – 2006</span>
+            </div>
+            <p style="font-size: 14px; margin-left: 0;"><b>Ph.D., Mathematics and Computer Science</b> | <b>Master,
+                    Computer Science</b></p>
+        </section>
+
+        <section id="certifications">
+            <h2>Licenses & Certifications</h2>
+            <div class="skills-grid">
+                <div class="skill-category"><span>AWS:</span> Solutions Architect, Cloud Practitioner</div>
+                <div class="skill-category"><span>Azure:</span> Fundamentals</div>
+                <div class="skill-category"><span>Agile:</span> SAFe 5 Agilist, CSM</div>
+                <div class="skill-category"><span>Other:</span> Salesforce Ranger, Google Analytics</div>
+            </div>
+        </section>
+
+        <div style="page-break-before: always;"></div>
+
+        <section id="portfolio">
+            <h2>Key Project Portfolio</h2>
+
+            <div class="project-item">
+                <div class="project-content">
+                    <h4>AI Productivity Framework (EPAM)</h4>
+                    <p>Designed and rolled out a comprehensive AI adoption strategy for Fortune 500 clients. Integrated
+                        GitHub Copilot and custom AI Agents into the enterprise SDLC, leading to data-driven gains in
+                        coding speed and quality.</p>
+                </div>
+            </div>
+
+            <div class="project-item">
+                <div class="project-content">
+                    <h4>Levi’s Global Mobile Apps (React Native)</h4>
+                    <p>Technological overhaul of the global mobile presence for Levi Strauss & Co. Transitioned to a
+                        high-performance React Native architecture, integrated AI-driven search, and unified the loyalty
+                        experience across US, CA, and EU markets.</p>
+                </div>
+            </div>
+
+            <div class="project-item">
+                <div class="project-content">
+                    <h4>Digital Transformation & SAP ERP (LS&Co Europe)</h4>
+                    <p>Managed the end-to-end digital transformation of the European division. Successfully migrated
+                        legacy operations to SAP, integrated award-winning eCommerce platforms, and implemented
+                        omnichannel services like BOPIS/ROPIS.</p>
+                </div>
+            </div>
+
+            <div class="project-item">
+                <div class="project-content">
+                    <h4>Corporate CRM & MDM Migration (VTB Bank)</h4>
+                    <p>Modernized the corporate banking infrastructure for 10,000+ users. Directed 12 Agile teams to
+                        move from monolithic systems to a modern Java/PostgreSQL microservices architecture,
+                        significantly reducing maintenance costs.</p>
+                </div>
+            </div>
+        </section>
+    </div>
+</body>
+
+</html>
