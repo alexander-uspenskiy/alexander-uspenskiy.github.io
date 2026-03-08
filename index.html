@@ -1,855 +1,693 @@
-<!DOCTYPE HTML>
-
-<html>
+<!DOCTYPE html>
+<html lang="en">
 
 <head>
-	<title>Alex Uspenskiy Profile</title>
-	<meta charset="utf-8" />
-	<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
-	<link rel="stylesheet" href="assets/css/main.css" />
-	<link rel="icon" href="images/icon.jpg" type="image/jpeg" />
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Alexander Uspenskiy — AI Agentic Engineering & Solutions Architect</title>
+	<meta name="description"
+		content="Alexander Uspenskiy, PhD — AI Agentic Engineering leader, Solutions Architect, and Delivery Director. Expert in AI Agents, RAG, LLM fine-tuning, and cloud-native architecture. 3x Cloud Certified (AWS, Azure).">
+	<meta name="keywords"
+		content="AI Agentic Engineering, AI Architect, Solutions Architect, AI Agents, RAG, LLM, SDLC, AWS, Azure, EPAM, Delivery Director">
+	<meta name="author" content="Alexander Uspenskiy">
+
+	<!-- Open Graph -->
+	<meta property="og:title" content="Alexander Uspenskiy — AI Agentic Engineering & Solutions Architect">
+	<meta property="og:description"
+		content="AI Agentic Engineering leader with 15+ years in digital transformation. Expert in multi-agent systems, RAG, and AI SDLC optimization.">
+	<meta property="og:type" content="website">
+	<meta property="og:url" content="https://alexander-uspenskiy.github.io">
+	<meta property="og:image" content="https://alexander-uspenskiy.github.io/images/avatar.jpg">
+
+	<!-- Favicon -->
+	<link rel="icon" href="images/icon.jpg" type="image/jpeg">
+
+	<!-- Styles -->
+	<link rel="stylesheet" href="assets/css/main.css">
 </head>
+
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-26LK8EK35B"></script>
 <script>
 	window.dataLayer = window.dataLayer || [];
 	function gtag() { dataLayer.push(arguments); }
 	gtag('js', new Date());
-
 	gtag('config', 'G-26LK8EK35B');
 </script>
 
-<body class="is-preload">
+<body>
 
-	<!-- Header -->
-	<section id="header">
-		<header>
-			<span class="image avatar"><img src="images/avatar.jpg" alt="" /></span>
-			<h1 id="logo">Alex Uspenskiy</h1>
-			<p class="small-font">AI Programs | AI SDLC | Delivery and Program Director | AI/ML | Solutions Architect |
-				3 x Cloud Certified AWS, Azure | Agile Expert (SAFe, CSM) | eCommerce, Web, Mobile Apps </br>My
-				publications: <a href="https://alexander-uspenskiy.medium.com">alexander-uspenskiy.medium.com</a></p>
-		</header>
-		<nav id="nav">
-			<ul>
-				<li><a href="#one" class="active">About</a></li>
-				<li><a href="#two">My Experience</a></li>
-				<li><a href="#three">Projects and Services</a></li>
-				<li><a href="#four">Contact</a></li>
-			</ul>
-		</nav>
-		<footer>
-			<ul class="icons">
+	<!-- ======== Navigation ======== -->
+	<nav class="nav" id="nav">
+		<div class="container nav-inner">
+			<a href="#" class="nav-logo">
+				<span class="logo-icon">AU</span>
+				<span>Alex Uspenskiy</span>
+			</a>
+			<div class="nav-links" id="nav-links">
+				<a href="#about">About</a>
+				<a href="#expertise">Expertise</a>
+				<a href="#experience">Experience</a>
+				<a href="#projects">Projects</a>
+				<a href="#contact" class="nav-cta">Contact</a>
+			</div>
+			<button class="nav-toggle" id="nav-toggle" aria-label="Toggle navigation">
+				<span></span>
+				<span></span>
+				<span></span>
+			</button>
+		</div>
+	</nav>
 
-				<li><a href="https://www.facebook.com/alexandre.uspenskiy" class="icon brands fa-facebook-f"><span
-							class="label">Facebook</span></a></li>
+	<!-- ======== Hero Section ======== -->
+	<section class="hero" id="hero">
+		<canvas id="particle-canvas"></canvas>
+		<div class="hero-content container">
+			<div class="hero-badge">
+				<span class="pulse-dot"></span>
+				Open to AI Leadership Opportunities
+			</div>
+			<h1 class="hero-title">
+				<span class="gradient-text">AI Agentic</span><br>
+				Engineering
+			</h1>
+			<p class="hero-subtitle">
+				Proven IT leader with 15+ years driving AI adoption, multi-agent systems, and large-scale digital
+				transformation. PhD in Mathematics & Computer Science.
+			</p>
 
-				<li><a href="mailto:alexander.uspensky@gmail.com" class="icon solid fa-envelope"><span
-							class="label">Email</span></a></li>
-			</ul>
-		</footer>
+			<div class="hero-metrics">
+				<div class="metric-card">
+					<span class="metric-value" data-counter="28" data-suffix="%">0%</span>
+					<span class="metric-label">Faster Delivery</span>
+				</div>
+				<div class="metric-card">
+					<span class="metric-value" data-counter="65" data-suffix="%">0%</span>
+					<span class="metric-label">Test Automation</span>
+				</div>
+				<div class="metric-card">
+					<span class="metric-value" data-counter="32" data-suffix="%">0%</span>
+					<span class="metric-label">Coding Speed</span>
+				</div>
+				<div class="metric-card">
+					<span class="metric-value" data-counter="120" data-suffix="+">0</span>
+					<span class="metric-label">Team Members Led</span>
+				</div>
+			</div>
+
+			<div class="hero-actions">
+				<a href="#projects" class="btn btn-primary">View Portfolio</a>
+				<a href="#contact" class="btn btn-ghost">Get in Touch</a>
+			</div>
+		</div>
+		<div class="scroll-indicator">
+			<span>Scroll</span>
+			<div class="arrow"></div>
+		</div>
 	</section>
 
-	<!-- Wrapper -->
-	<div id="wrapper">
-
-		<!-- Main -->
-		<div id="main">
-
-			<!-- One -->
-			<section id="one">
-				<div class="image main" data-position="center">
-					<img src="images/banner.jpeg" alt="" />
+	<!-- ======== About Section ======== -->
+	<section class="about" id="about">
+		<div class="container">
+			<div class="about-grid">
+				<div class="about-photo-wrapper reveal">
+					<img src="images/avatar.jpg" alt="Alexander Uspenskiy" class="about-photo">
 				</div>
-				<div class="container">
-					<header class="major">
-						<h2>Alex Uspenskiy</h2>
-						About me
-					</header></br>
-
-					</header>
-					<p>Hi, my name is Alexander Uspenskiy. I am a proven IT leader with a track record of driving and
-						delivering successful large-scale projects and programs in AI Adoption (GitHub Copilot, Cursor,
-						AI Agents), e-commerce, ERP, CRM, and digital transformation. Defined and implemented strategic
-						product roadmaps, built and led high-performing teams, and delivered measurable results. Skilled
-						communicator and facilitator adept at managing complex $10-100 million dollar projects from
-						inception to implementation. Certified Agile expert (CSM, SAFe). Certified Cloud Architect (AWS,
-						Azure). Additional expertise includes:
-					<table style="border-collapse: collapse; width: 100%; background-color: white;">
-						<tr>
-							<td style="border: none;">
-								<ul>
-									<li>AI Adoption & Delivery</li>
-									<li>Enterprise scale Programs</li>
-									<li>Cloud Certified Architect (AWS, Azure)</li>
-									<li>Agile approach (CSM, SAFe 5.0)</li>
-									<li>Project Management</li>
-									<li>Budget Management</li>
-									<li>Vendor Management</li>
-									<li>Technical and Architect Management</li>
-									<li>Risk Management</li>
-								</ul>
-							</td>
-							<td style="border: none;">
-								<ul>
-									<li>Change Management</li>
-									<li>Release Management</li>
-									<li>Strategic Planning</li>
-									<li>Process Development</li>
-									<li>Relationship Management</li>
-									<li>Team Building</li>
-									<li>Problem Solving</li>
-								</ul>
-							</td>
-						</tr>
-					</table>
-					<style>
-						/* General styling for images in the div */
-						.banner-container {
-							display: flex;
-							justify-content: space-around;
-							/* Ensure even distribution of images */
-							align-items: flex-start;
-							/* Aligns the images vertically at the top */
-							flex-wrap: wrap;
-							/* Wrap the images when necessary */
-							gap: 10px;
-							/* Adds space between the images */
-						}
-
-						.banner-container div {
-							display: flex;
-							justify-content: center;
-							align-items: center;
-							flex-basis: 150px;
-							/* Ensures each image block takes equal space */
-						}
-
-						.banner-container img {
-							width: 150px;
-							height: 150px;
-						}
-
-						/* Responsive design for small screens */
-						@media screen and (max-width: 768px) {
-							.banner-container {
-								justify-content: space-evenly;
-								/* Distribute images evenly on smaller screens */
-								align-items: flex-start;
-								/* Aligns images vertically at the top */
-							}
-
-							.banner-container img {
-								width: 120px;
-								height: 120px;
-								/* Reduce size for tablets */
-							}
-						}
-
-						/* Further reduce size for very small screens like phones */
-						@media screen and (max-width: 480px) {
-							.banner-container {
-								justify-content: space-evenly;
-								/* Ensure images are well distributed */
-								align-items: flex-start;
-								/* Align images vertically on small screens */
-							}
-
-							.banner-container img {
-								width: 100px;
-								height: 100px;
-								/* Reduce size for phones */
-							}
-						}
-					</style>
-
-
-
-					<div class="banner-container">
-						<div>
-							<img src="images/AWS_Pract.png" alt="AWS Certified Practitioner banner">
+				<div class="reveal reveal-delay-1">
+					<span class="section-label">About Me</span>
+					<h2 class="section-title">Building the Future with <span class="gradient-text">AI Agents</span>
+					</h2>
+					<p class="about-bio">
+						Hi, I'm <strong>Alexander Uspenskiy, PhD</strong> — an AI Agentic Engineering leader currently
+						at <strong>EPAM Systems</strong>, where I architect and deploy AI Agents across the entire
+						software development lifecycle. I specialize in <strong>multi-agent systems, RAG, LLM
+							fine-tuning</strong>, and enterprise-scale AI adoption.
+					</p>
+					<p class="about-bio">
+						With 15+ years leading teams of 120+ people and managing $10–100M budgets, I've driven
+						transformative results at <strong>Levi Strauss & Co.</strong>,
+						<strong>Dell Technologies</strong>, <strong>VTB Bank</strong>, and <strong>Mary Kay
+							Inc.</strong> — from award-winning eCommerce platforms to global mobile apps reaching 5.4M+
+						users.
+					</p>
+					<div class="cert-badges">
+						<div class="cert-badge" title="AWS Solutions Architect">
+							<img src="images/solution_archtect.png" alt="AWS Solutions Architect">
 						</div>
-						<div>
-							<img src="images/solution_archtect.png" alt="AWS Certified Architect banner">
+						<div class="cert-badge" title="AWS Cloud Practitioner">
+							<img src="images/AWS_Pract.png" alt="AWS Cloud Practitioner">
 						</div>
-						<div>
-							<img src="images/Safe_bage_300px.png" alt="SAFe">
+						<div class="cert-badge" title="Microsoft Azure Fundamentals">
+							<img src="images/Azure.png" alt="Azure Fundamentals">
 						</div>
-						<div>
-							<img src="images/Azure.png" alt="Azure">
+						<div class="cert-badge" title="SAFe 5 Agilist">
+							<img src="images/Safe_bage_300px.png" alt="SAFe 5 Agilist">
 						</div>
-						<div>
+						<div class="cert-badge" title="Certified ScrumMaster">
 							<img src="images/csm.png" alt="CSM">
 						</div>
 					</div>
-
-
-
-
-
 				</div>
-			</section>
-
-			<!-- Two -->
-			<section id="two">
-				<div class="container">
-					<h3>My Experience</h3>
-					<a href="resume_portfolio_src.html" target="_blank">View/Print Latest Portfolio &
-						Resume</a></br></br>
-					<p>
-						<b>Delivery Manager - AI Programs</b>
-						<br>EPAM Systems
-						<br>Feb 2025 – Present
-					<ul>
-						<li><b>AI Adoption & Delivery:</b> Leading initiatives for AI Adoption (GitHub Copilot, Cursor,
-							etc.) and AI Agents implementation across a diverse client portfolio.</li>
-						<li><b>Productivity Metrics:</b> Developed advanced AI Productivity metrics and dashboards using
-							Jira, GitHub, GitLab, Azure DevOps, and GitHub Copilot to track and optimize delivery
-							efficiency.</li>
-						<li><b>SDLC Optimization:</b> Directed the rollout of "AI Run" services across the SDLC for
-							multiple clients, achieving:
-							<ul>
-								<li>28% reduction in User Story lead time.</li>
-								<li>65% reduction in Unit Test development time.</li>
-								<li>26% overall improvement in team productivity.</li>
-							</ul>
-						</li>
-						<li><b>AI Agents Deployment:</b> Successfully deployed AI Agents for BA, QA, Dev, and Doc,
-							resulting in 20-35% performance growth.</li>
-						<li><b>IoT & Cloud Strategy:</b> Managed IoT (digital twins) projects, improving deployment
-							frequency by 25% and reducing failure rates via AI Run framework.</li>
-						<li><b>Model Fine-Tuning:</b> Customizing and fine-tuning LLMs and Stable Diffusion models,
-							reducing inference time by 20%.</li>
-					</ul>
-					</p>
-					<hr>
-					<p>
-						<b>Independent Contractor - AI and Ecom Programs</b>
-						<br>Hesperis.ai
-						<br>May 2024 – Feb 2025
-					<ul>
-						<li>Leading strategic Agile initiatives and AI adoption for eCommerce projects, resulting in a
-							20% reduction in project delivery time and a 15% increase in customer satisfaction.</li>
-						<li>Orchestrating cloud implementation strategies and guiding development teams in adopting best
-							Agile practices for cloud-native solutions.</li>
-						<li>Establishing industry-leading development practices to elevate code quality and team
-							efficiency.</li>
-					</ul>
-					</p>
-					<hr>
-					<p>
-						<b>Senior Mobile App Engineering Manager / AI Enterprise Architect</b>
-						<br>Levi Strauss & Co.
-						<br>San Francisco Bay Area (Remote)
-						<br>October 2022 – May 2024
-					<ul>
-						<li>Managed personnel across a 30+ person distributed engineering team in the Americas and
-							India. Established and refined engineering best practices leading to improved performance,
-							reduced development cycles, and improved application quality.</li>
-						<li>Supervised the delivery of Mobile Apps for the US/CA and European regions, overseeing CI/CD
-							pipeline, managing releases, and handling distribution through the Apple Store and Google
-							Store.</li>
-						<li>Managed Levi’s Mobile application development and delivery on a bi-weekly cadence (LSM).
-						</li>
-						<li>Led initiatives for Mobile Front End Architecture, including the implementation of React
-							Native New Architecture.</li>
-						<li>Achieved significant performance enhancements, reducing app load time from 9 seconds to 2
-							seconds and decreasing page rendering time by 60%.</li>
-					</ul>
-
-
-
-					<b>Key Achievements:</b>
-					<ul>
-						<li>Enhanced user engagement metrics: increased the percentage of visitors opening the app and
-							reaching a Product Details Page by 25% in US/CA and 50% in Europe by implementing a new
-							search vendor.</li>
-						<li>Improved conversion metrics: increased the percentage of visitors adding items to the cart
-							by 10% for both US/CA and Europe.</li>
-						<li>Increased Loyal Membership acquisition and re-engagement, reaching 2.9M in US/CA and 2.5M in
-							Europe by changing the backend integration architecture.</li>
-						<li>Enhanced purchase frequency by 10% for US/CA by redesigning the cart page and optimizing UI.
-						</li>
-					</ul>
-					</p>
-					<p>
-						<b>Director of Information Technology</b>
-						<br>Levi Strauss & Co.
-						<br>October 2019 - September 2022
-						<br>
-					<ul>
-						<li>Led Digital Transformation in LS&Co Europe, managed full IT Portfolio, adopted Agile (SAFe
-							5.0) for cross-functional IT teams, local IT systems integrations to an ERP system, 3rd
-							party vendors management (outsourcing, SaaS, PaaS, IaaS solutions integrations etc.).</li>
-						<li>ERP including Apparel Mark & Tracing - implemented on time and budget, 100% integration with
-							global LS&Co systems (SAP).</li>
-						<li>ECOMM site ru.levi.com - new relaunch in 2020, award-winning site, traffic Y/Y +64.3%,
-							placed orders +470.3%, conversion rate +247%, high-performance cloud server architecture.
-						</li>
-						<li>CRM/Loyalty program - 500K+ new customers registration in 2021/22, full integration with
-							ECOMM and Retail operations.</li>
-						<li>OMNI channel projects - Find in Store, Loyalty integration (SaaS), Reserve Online Pickup in
-							Store.</li>
-						<li>Office Move (infrastructure) - Server room (3 full racks) and LAN moved in 3 months for
-							LS&Co office.</li>
-					</ul>
-					<b>Projects:</b>
-					<ul>
-						<li>ERP (FIN, WH, Logistics, Planning) implementation project.</li>
-						<li>ECOMM/OMNI - Online Prepayments, Personalization, Buy Online Pickup in Store.</li>
-						<li>Mobile Engagement Application (including ECOMM, Loyalty, Discovery cards, and more).</li>
-					</ul>
-					<b>Processes:</b> Agile/SAFe process implementation for IT projects.
-					</p>
-					<hr>
-
-					<p>
-						<b>Delivery Director / Enterprise Architect</b>
-						<br>VTB Bank
-						<br>August 2018 – August 2019
-						<br>
-					<ul>
-						<li>Spearheaded the development and support of VTB bank's Corporate Business CRM and MDM
-							systems, leading 12 cross-functional Agile teams (120+ personnel) to deliver solutions for
-							10,000+ internal users. Technology stack: Python, Java, C#, MS Project, Jira, Confluence,
-							ELK Stack.</li>
-						<li>Delivered new features: Implemented more than 10 vital features for CRM and MDM
-							applications, enhancing business functionality and streamlining operator workflows.</li>
-						<li>Increased operational efficiency: Streamlined development processes through the successful
-							implementation of a new SDLC (JIRA, Confluence, etc.), aligning with the global bank
-							initiative, resulting in a 10% reduction (USD $1M) in annual outsourcing costs through open
-							tender negotiations.</li>
-						<li>Enhanced technological capabilities: Led the migration to a modern technology stack (Java,
-							PostgreSQL, React, etc.), enabling future scalability and improved user experience.</li>
-						<li>Optimized team structure: Established a two-stream Agile model with 12 cross-functional
-							teams (PO, BA, QA, DEV) to ensure efficient project delivery aligned with business needs.
-						</li>
-					</ul>
-					</p>
-
-					<p>
-						<b>Applications Development Manager/Achitect</b>
-						<br>Mary Kay Inc.
-						<br>August 2017 - August 2018
-						<br>
-					<ul>
-						<li>Offered technical leadership and supervised IT operations. Designed and implemented the IT
-							development process to align with the company’s strategic goals.</li>
-						<li>Accountable for overseeing the overall management and performance of teams, including
-							third-party resources. Integrations to an ERP system. Tech stack: Shopify, Salsify, SAP B1,
-							Salesforce.</li>
-					</ul>
-					</p>
-					<hr>
-
-					<p>
-						<b>Applications Development Manager</b>
-						<br>Mary Kay Inc.
-						<br>January 2008 - August 2017
-						<br>
-					<ul>
-						<li>Recruited to provide technical leadership and manage IT activities around the Europe region.
-							Developed and implemented the IT development process in order to support the company’s
-							strategic objectives.</li>
-						<li>Achievements: TOP 10 E-Commerce platform developed and deployed to USA, LA and EMEA markets.
-							Implementation and integrations to an ERP system (Europe market).</li>
-						<li>3rd party vendors management (outsourcing, integration solutions).</li>
-						<li>10+ successfully implemented global projects related to E-Commerce, Mobile, Warehouse
-							Management, and E-Business applications for the Europe and US region.</li>
-						<li>Strong distributed IT team of 50+ developers worldwide (US, Ukraine, Mexico, China, Korea,
-							Russia).</li>
-						<li>Trust and great relationship between the head office and CoE IT Team.</li>
-					</ul>
-					</p>
-					<hr>
-
-					<p>
-						<b>Development Team Leader</b>
-						<br>Dell Computers.
-						<br>June 2003 - January 2008
-						<br>
-					<ul>
-						<li>Led distributed development teams across multiple DELL US/EMEA projects. Completed five big
-							E-Commerce Enterprise projects.</li>
-					</ul>
-					</p>
-					<hr>
-
-					<h4>Education</h4>
-					<p>
-						<b>Bauman Moscow State Technical University</b>
-						<br>Ph.D., Mathematics and Computer Science · (2000 - 2006)
-						<br>Master, Computer Science · (1994 - 2000)
-					</p>
-				</div>
-			</section>
-
-			<!-- Three -->
-			<section id="three">
-				<div class="container">
-					<h3>My main projects</h3>
-					<p>Enterprise software development</p>
-					<div class="features">
-						<article>
-							<a href="#" class="image"><img src="images/banner.jpeg" alt=""
-									style="width: 200px; height: 200px;" /></a>
-							<div class="inner">
-								<h4>AI SDLC & Adoption Framework</h4>
-								<p>Directed AI Run services rollout at EPAM. Achieved 28% reduction in lead time and 65%
-									reduction in unit test development time using GitHub Copilot and AI Agents.</p>
-							</div>
-						</article>
-
-						<article>
-							<a href="#" class="image"><img src="images/mobile.jpg" alt=""
-									style="width: 200px; height: 200px;" /></a>
-							<div class="inner">
-								<h4>Global Mobile Applications</h4>
-								<p>Led Levi’s Mobile App delivery for US/CA and Europe. Migrated to React Native New
-									Architecture, reducing load times by 70% and scaling to 5.4M+ loyal members.</p>
-								<a href="/assets/Docs/Alex_Uspenskiy_Mobile_Portfolio.pdf">Portfolio PDF</a>
-							</div>
-						</article>
-
-						<article>
-							<a href="#" class="image"><img src="images/ecomm.jpg" alt=""
-									style="width: 200px; height: 200px;" /></a>
-							<div class="inner">
-								<h4>Award-winning eCommerce</h4>
-								<p>Relaunched ru.levi.com in Europe. Achieved +470% orders growth and +247% conversion
-									rate through high-performance AWS cloud architecture.</p>
-							</div>
-						</article>
-
-						<article>
-							<a href="#" class="image"><img src="images/ent_apps.jpg" alt=""
-									style="width: 200px; height: 200px;" /></a>
-							<div class="inner">
-								<h4>Enterprise CRM & MDM</h4>
-								<p>Led transformation of VTB Bank’s corporate systems for 10,000+ users. Migrated to
-									modern Java/PostgreSQL stack and saved $1M in annual costs.</p>
-							</div>
-						</article>
-
-					</div>
-
-					<h3>My Services</h3>
-					<p>Enterprise software development</p>
-					<div class="features">
-						<article>
-							<a href="#" class="image"><img src="images/banner.jpeg" alt=""
-									style="width: 200px; height: 200px;" /></a>
-							<div class="inner">
-								<h4>AI Adoption & Delivery Consulting</h4>
-								<p>AI Strategy, GitHub Copilot rollout, AI Agents, AI SDLC optimization, LLM
-									integration, and productivity metrics.</p>
-							</div>
-						</article>
-
-						<article>
-							<a href="#" class="image"><img src="images/mobile.jpg" alt=""
-									style="width: 200px; height: 200px;" /></a>
-							<div class="inner">
-								<h4>Enterprise Mobile App Consulting</h4>
-								<p>Global Architecture, Frontend/Backend (API, GraphQL), Agile Development, Process
-									Development</p>
-
-							</div>
-						</article>
-
-						<article>
-							<a href="#" class="image"><img src="images/ecomm.jpg" alt=""
-									style="width: 200px; height: 200px;" /></a>
-							<div class="inner">
-								<h4>eCommerce Consulting</h4>
-								<p>Enterprise Architecture, Frontend/Backend, Agile Development, Process Development
-								</p>
-							</div>
-						</article>
-
-						<article>
-							<a href="#" class="image"><img src="images/ent_apps.jpg" alt=""
-									style="width: 200px; height: 200px;" /></a>
-							<div class="inner">
-								<h4>ERP, WMS, CRM, Loyalty implementation expertise</h4>
-								<p>Enterprise apps implementation</p>
-							</div>
-						</article>
-
-					</div>
-				</div>
-			</section>
-
-			<!-- Four -->
-			<section id="four">
-				<div class="container">
-					<h3>Contact Me</h3>
-					<p>LinkedIn: <a href="https://linkedin.com/in/uspensky">linkedin.com/in/uspensky</a></br>
-						Phone: +52 998 406 5952 (Mobile)</br>
-						Address: Cancun, Mexico, Quintana Roo</br>
-						Email: <a href="mailto:alexander.uspensky@gmail.com">alexander.uspensky@gmail.com</a></br>
-						Publications: <a href="alexander-uspenskiy.medium.com">alexander-uspenskiy.medium.com</a></br>
-						GitHub: <a
-							href="https://github.com/alexander-uspenskiy">https://github.com/alexander-uspenskiy</a>
-					</p>
-
-
-				</div>
-
-
-			</section>
-
-			<!-- Five -->
-			<!--     Corris Hello!    CorrisBranch Edition!
-							<section id="five">
-								<div class="container">
-									<h3>Elements</h3>
-
-									<section>
-										<h4>Text</h4>
-										<p>This is <b>bold</b> and this is <strong>strong</strong>. This is <i>italic</i> and this is <em>emphasized</em>.
-										This is <sup>superscript</sup> text and this is <sub>subscript</sub> text.
-										This is <u>underlined</u> and this is code: <code>for (;;) { ... }</code>. Finally, <a href="#">this is a link</a>.</p>
-										<hr />
-										<header>
-											<h4>Heading with a Subtitle</h4>
-											<p>Lorem ipsum dolor sit amet nullam id egestas urna aliquam</p>
-										</header>
-										<p>Nunc lacinia ante nunc ac lobortis. Interdum adipiscing gravida odio porttitor sem non mi integer non faucibus ornare mi ut ante amet placerat aliquet. Volutpat eu sed ante lacinia sapien lorem accumsan varius montes viverra nibh in adipiscing blandit tempus accumsan.</p>
-										<header>
-											<h5>Heading with a Subtitle</h5>
-											<p>Lorem ipsum dolor sit amet nullam id egestas urna aliquam</p>
-										</header>
-										<p>Nunc lacinia ante nunc ac lobortis. Interdum adipiscing gravida odio porttitor sem non mi integer non faucibus ornare mi ut ante amet placerat aliquet. Volutpat eu sed ante lacinia sapien lorem accumsan varius montes viverra nibh in adipiscing blandit tempus accumsan.</p>
-										<hr />
-										<h2>Heading Level 2</h2>
-										<h3>Heading Level 3</h3>
-										<h4>Heading Level 4</h4>
-										<h5>Heading Level 5</h5>
-										<h6>Heading Level 6</h6>
-										<hr />
-										<h5>Blockquote</h5>
-										<blockquote>Fringilla nisl. Donec accumsan interdum nisi, quis tincidunt felis sagittis eget tempus euismod. Vestibulum ante ipsum primis in faucibus vestibulum. Blandit adipiscing eu felis iaculis volutpat ac adipiscing accumsan faucibus. Vestibulum ante ipsum primis in faucibus lorem ipsum dolor sit amet nullam adipiscing eu felis.</blockquote>
-										<h5>Preformatted</h5>
-										<pre><code>i = 0;
-
-while (!deck.isInOrder()) {
-    print 'Iteration ' + i;
-    deck.shuffle();
-    i++;
-}
-
-print 'It took ' + i + ' iterations to sort the deck.';</code></pre>
-									</section>
-
-									<section>
-										<h4>Lists</h4>
-										<div class="row">
-											<div class="col-6 col-12-xsmall">
-												<h5>Unordered</h5>
-												<ul>
-													<li>Dolor pulvinar etiam magna etiam.</li>
-													<li>Sagittis adipiscing lorem eleifend.</li>
-													<li>Felis enim feugiat dolore viverra.</li>
-												</ul>
-												<h5>Alternate</h5>
-												<ul class="alt">
-													<li>Dolor pulvinar etiam magna etiam.</li>
-													<li>Sagittis adipiscing lorem eleifend.</li>
-													<li>Felis enim feugiat dolore viverra.</li>
-												</ul>
-											</div>
-											<div class="col-6 col-12-xsmall">
-												<h5>Ordered</h5>
-												<ol>
-													<li>Dolor pulvinar etiam magna etiam.</li>
-													<li>Etiam vel felis at lorem sed viverra.</li>
-													<li>Felis enim feugiat dolore viverra.</li>
-													<li>Dolor pulvinar etiam magna etiam.</li>
-													<li>Etiam vel felis at lorem sed viverra.</li>
-													<li>Felis enim feugiat dolore viverra.</li>
-												</ol>
-												<h5>Icons</h5>
-												<ul class="icons">
-													<li><a href="#" class="icon brands fa-twitter"><span class="label">Twitter</span></a></li>
-													<li><a href="#" class="icon brands fa-facebook-f"><span class="label">Facebook</span></a></li>
-													<li><a href="#" class="icon brands fa-instagram"><span class="label">Instagram</span></a></li>
-													<li><a href="#" class="icon brands fa-github"><span class="label">Github</span></a></li>
-													<li><a href="#" class="icon brands fa-dribbble"><span class="label">Dribbble</span></a></li>
-													<li><a href="#" class="icon brands fa-tumblr"><span class="label">Tumblr</span></a></li>
-												</ul>
-											</div>
-										</div>
-										<h5>Actions</h5>
-										<ul class="actions">
-											<li><a href="#" class="button primary">Default</a></li>
-											<li><a href="#" class="button">Default</a></li>
-											<li><a href="#" class="button alt">Default</a></li>
-										</ul>
-										<ul class="actions small">
-											<li><a href="#" class="button primary small">Small</a></li>
-											<li><a href="#" class="button small">Small</a></li>
-											<li><a href="#" class="button alt small">Small</a></li>
-										</ul>
-										<div class="row">
-											<div class="col-3 col-6-medium col-12-xsmall">
-												<ul class="actions stacked">
-													<li><a href="#" class="button primary">Default</a></li>
-													<li><a href="#" class="button">Default</a></li>
-													<li><a href="#" class="button alt">Default</a></li>
-												</ul>
-											</div>
-											<div class="col-3 col-6 col-12-xsmall">
-												<ul class="actions stacked">
-													<li><a href="#" class="button primary small">Small</a></li>
-													<li><a href="#" class="button small">Small</a></li>
-													<li><a href="#" class="button alt small">Small</a></li>
-												</ul>
-											</div>
-											<div class="col-3 col-6-medium col-12-xsmall">
-												<ul class="actions stacked">
-													<li><a href="#" class="button primary fit">Default</a></li>
-													<li><a href="#" class="button fit">Default</a></li>
-													<li><a href="#" class="button alt fit">Default</a></li>
-												</ul>
-											</div>
-											<div class="col-3 col-6-medium col-12-xsmall">
-												<ul class="actions stacked">
-													<li><a href="#" class="button primary small fit">Small</a></li>
-													<li><a href="#" class="button small fit">Small</a></li>
-													<li><a href="#" class="button alt small fit">Small</a></li>
-												</ul>
-											</div>
-										</div>
-									</section>
-
-									<section>
-										<h4>Table</h4>
-										<h5>Default</h5>
-										<div class="table-wrapper">
-											<table>
-												<thead>
-													<tr>
-														<th>Name</th>
-														<th>Description</th>
-														<th>Price</th>
-													</tr>
-												</thead>
-												<tbody>
-													<tr>
-														<td>Item One</td>
-														<td>Ante turpis integer aliquet porttitor.</td>
-														<td>29.99</td>
-													</tr>
-													<tr>
-														<td>Item Two</td>
-														<td>Vis ac commodo adipiscing arcu aliquet.</td>
-														<td>19.99</td>
-													</tr>
-													<tr>
-														<td>Item Three</td>
-														<td> Morbi faucibus arcu accumsan lorem.</td>
-														<td>29.99</td>
-													</tr>
-													<tr>
-														<td>Item Four</td>
-														<td>Vitae integer tempus condimentum.</td>
-														<td>19.99</td>
-													</tr>
-													<tr>
-														<td>Item Five</td>
-														<td>Ante turpis integer aliquet porttitor.</td>
-														<td>29.99</td>
-													</tr>
-												</tbody>
-												<tfoot>
-													<tr>
-														<td colspan="2"></td>
-														<td>100.00</td>
-													</tr>
-												</tfoot>
-											</table>
-										</div>
-
-										<h5>Alternate</h5>
-										<div class="table-wrapper">
-											<table class="alt">
-												<thead>
-													<tr>
-														<th>Name</th>
-														<th>Description</th>
-														<th>Price</th>
-													</tr>
-												</thead>
-												<tbody>
-													<tr>
-														<td>Item One</td>
-														<td>Ante turpis integer aliquet porttitor.</td>
-														<td>29.99</td>
-													</tr>
-													<tr>
-														<td>Item Two</td>
-														<td>Vis ac commodo adipiscing arcu aliquet.</td>
-														<td>19.99</td>
-													</tr>
-													<tr>
-														<td>Item Three</td>
-														<td> Morbi faucibus arcu accumsan lorem.</td>
-														<td>29.99</td>
-													</tr>
-													<tr>
-														<td>Item Four</td>
-														<td>Vitae integer tempus condimentum.</td>
-														<td>19.99</td>
-													</tr>
-													<tr>
-														<td>Item Five</td>
-														<td>Ante turpis integer aliquet porttitor.</td>
-														<td>29.99</td>
-													</tr>
-												</tbody>
-												<tfoot>
-													<tr>
-														<td colspan="2"></td>
-														<td>100.00</td>
-													</tr>
-												</tfoot>
-											</table>
-										</div>
-									</section>
-
-									<section>
-										<h4>Buttons</h4>
-										<ul class="actions">
-											<li><a href="#" class="button primary">Primary</a></li>
-											<li><a href="#" class="button">Default</a></li>
-											<li><a href="#" class="button alt">Alternate</a></li>
-										</ul>
-										<ul class="actions">
-											<li><a href="#" class="button primary large">Large</a></li>
-											<li><a href="#" class="button">Default</a></li>
-											<li><a href="#" class="button alt small">Small</a></li>
-										</ul>
-										<ul class="actions fit">
-											<li><a href="#" class="button primary fit">Fit</a></li>
-											<li><a href="#" class="button fit">Fit</a></li>
-											<li><a href="#" class="button alt fit">Fit</a></li>
-										</ul>
-										<ul class="actions fit small">
-											<li><a href="#" class="button primary fit small">Fit + Small</a></li>
-											<li><a href="#" class="button fit small">Fit + Small</a></li>
-											<li><a href="#" class="button alt fit small">Fit + Small</a></li>
-										</ul>
-										<ul class="actions">
-											<li><a href="#" class="button primary icon solid fa-download">Icon</a></li>
-											<li><a href="#" class="button icon solid fa-download">Icon</a></li>
-											<li><a href="#" class="button alt icon solid fa-check">Icon</a></li>
-										</ul>
-										<ul class="actions">
-											<li><span class="button primary disabled">Primary</span></li>
-											<li><span class="button disabled">Default</span></li>
-											<li><span class="button alt disabled">Alternate</span></li>
-										</ul>
-									</section>
-
-									<section>
-										<h4>Form</h4>
-										<form method="post" action="#">
-											<div class="row gtr-uniform">
-												<div class="col-6 col-12-xsmall">
-													<input type="text" name="demo-name" id="demo-name" value="" placeholder="Name" />
-												</div>
-												<div class="col-6 col-12-xsmall">
-													<input type="email" name="demo-email" id="demo-email" value="" placeholder="Email" />
-												</div>
-												<div class="col-12">
-													<select name="demo-category" id="demo-category">
-														<option value="">- Category -</option>
-														<option value="1">Manufacturing</option>
-														<option value="1">Shipping</option>
-														<option value="1">Administration</option>
-														<option value="1">Human Resources</option>
-													</select>
-												</div>
-												<div class="col-4 col-12-medium">
-													<input type="radio" id="demo-priority-low" name="demo-priority" checked>
-													<label for="demo-priority-low">Low Priority</label>
-												</div>
-												<div class="col-4 col-12-medium">
-													<input type="radio" id="demo-priority-normal" name="demo-priority">
-													<label for="demo-priority-normal">Normal Priority</label>
-												</div>
-												<div class="col-4 col-12-medium">
-													<input type="radio" id="demo-priority-high" name="demo-priority">
-													<label for="demo-priority-high">High Priority</label>
-												</div>
-												<div class="col-6 col-12-medium">
-													<input type="checkbox" id="demo-copy" name="demo-copy">
-													<label for="demo-copy">Email me a copy of this message</label>
-												</div>
-												<div class="col-6 col-12-medium">
-													<input type="checkbox" id="demo-human" name="demo-human" checked>
-													<label for="demo-human">I am a human and not a robot</label>
-												</div>
-												<div class="col-12">
-													<textarea name="demo-message" id="demo-message" placeholder="Enter your message" rows="6"></textarea>
-												</div>
-												<div class="col-12">
-													<ul class="actions">
-														<li><input type="submit" value="Send Message" /></li>
-														<li><input type="reset" value="Reset" class="alt" /></li>
-													</ul>
-												</div>
-											</div>
-										</form>
-									</section>
-
-									<section>
-										<h4>Image</h4>
-										<h5>Fit</h5>
-										<span class="image fit"><img src="images/banner.jpg" alt="" /></span>
-										<div class="box alt">
-											<div class="row gtr-50 gtr-uniform">
-												<div class="col-4"><span class="image fit"><img src="images/pic01.jpg" alt="" /></span></div>
-												<div class="col-4"><span class="image fit"><img src="images/pic02.jpg" alt="" /></span></div>
-												<div class="col-4"><span class="image fit"><img src="images/pic03.jpg" alt="" /></span></div>
-												<div class="col-4"><span class="image fit"><img src="images/pic02.jpg" alt="" /></span></div>
-												<div class="col-4"><span class="image fit"><img src="images/pic03.jpg" alt="" /></span></div>
-												<div class="col-4"><span class="image fit"><img src="images/pic01.jpg" alt="" /></span></div>
-												<div class="col-4"><span class="image fit"><img src="images/pic03.jpg" alt="" /></span></div>
-												<div class="col-4"><span class="image fit"><img src="images/pic01.jpg" alt="" /></span></div>
-												<div class="col-4"><span class="image fit"><img src="images/pic02.jpg" alt="" /></span></div>
-											</div>
-										</div>
-										<h5>Left &amp; Right</h5>
-										<p><span class="image left"><img src="images/avatar.jpg" alt="" /></span>Fringilla nisl. Donec accumsan interdum nisi, quis tincidunt felis sagittis eget. tempus euismod. Vestibulum ante ipsum primis in faucibus vestibulum. Blandit adipiscing eu felis iaculis volutpat ac adipiscing accumsan eu faucibus. Integer ac pellentesque praesent tincidunt felis sagittis eget. tempus euismod. Vestibulum ante ipsum primis in faucibus vestibulum. Blandit adipiscing eu felis iaculis volutpat ac adipiscing accumsan eu faucibus. Integer ac pellentesque praesent. Donec accumsan interdum nisi, quis tincidunt felis sagittis eget. tempus euismod. Vestibulum ante ipsum primis in faucibus vestibulum. Blandit adipiscing eu felis iaculis volutpat ac adipiscing accumsan eu faucibus. Integer ac pellentesque praesent tincidunt felis sagittis eget. tempus euismod. Vestibulum ante ipsum primis in faucibus vestibulum. Blandit adipiscing eu felis iaculis volutpat ac adipiscing accumsan eu faucibus. Integer ac pellentesque praesent.</p>
-										<p><span class="image right"><img src="images/avatar.jpg" alt="" /></span>Fringilla nisl. Donec accumsan interdum nisi, quis tincidunt felis sagittis eget. tempus euismod. Vestibulum ante ipsum primis in faucibus vestibulum. Blandit adipiscing eu felis iaculis volutpat ac adipiscing accumsan eu faucibus. Integer ac pellentesque praesent tincidunt felis sagittis eget. tempus euismod. Vestibulum ante ipsum primis in faucibus vestibulum. Blandit adipiscing eu felis iaculis volutpat ac adipiscing accumsan eu faucibus. Integer ac pellentesque praesent. Donec accumsan interdum nisi, quis tincidunt felis sagittis eget. tempus euismod. Vestibulum ante ipsum primis in faucibus vestibulum. Blandit adipiscing eu felis iaculis volutpat ac adipiscing accumsan eu faucibus. Integer ac pellentesque praesent tincidunt felis sagittis eget. tempus euismod. Vestibulum ante ipsum primis in faucibus vestibulum. Blandit adipiscing eu felis iaculis volutpat ac adipiscing accumsan eu faucibus. Integer ac pellentesque praesent.</p>
-									</section>
-
-								</div>
-							</section>
-						-->
-
-		</div>
-
-		<!-- Footer -->
-		<section id="footer">
-			<div class="container">
-				<ul class="copyright">
-					<li>&copy; Alex Uspenskiy</li>
-				</ul>
 			</div>
-		</section>
+		</div>
+	</section>
 
-	</div>
+	<!-- ======== Expertise Section ======== -->
+	<section class="expertise" id="expertise">
+		<div class="container">
+			<div class="reveal">
+				<span class="section-label">Skills & Expertise</span>
+				<h2 class="section-title">What I <span class="gradient-text">Bring</span></h2>
+				<p class="section-subtitle">Deep technical expertise combined with executive-level delivery and
+					leadership.</p>
+			</div>
+
+			<div class="expertise-grid">
+				<!-- AI & ML -->
+				<div class="glass-card expertise-card reveal reveal-delay-1">
+					<div class="expertise-icon">🤖</div>
+					<h3>AI & Machine Learning</h3>
+					<div class="skill-item">
+						<div class="skill-header">
+							<span class="skill-name">AI Agents / Multi-Agent Systems</span>
+							<span class="skill-percent">95%</span>
+						</div>
+						<div class="skill-bar">
+							<div class="skill-fill" data-width="95%"></div>
+						</div>
+					</div>
+					<div class="skill-item">
+						<div class="skill-header">
+							<span class="skill-name">RAG & LLM Fine-Tuning</span>
+							<span class="skill-percent">90%</span>
+						</div>
+						<div class="skill-bar">
+							<div class="skill-fill" data-width="90%"></div>
+						</div>
+					</div>
+					<div class="skill-item">
+						<div class="skill-header">
+							<span class="skill-name">AI SDLC Optimization</span>
+							<span class="skill-percent">95%</span>
+						</div>
+						<div class="skill-bar">
+							<div class="skill-fill" data-width="95%"></div>
+						</div>
+					</div>
+					<div class="skill-item">
+						<div class="skill-header">
+							<span class="skill-name">Generative AI (Stable Diffusion)</span>
+							<span class="skill-percent">80%</span>
+						</div>
+						<div class="skill-bar">
+							<div class="skill-fill" data-width="80%"></div>
+						</div>
+					</div>
+					<div class="skill-item">
+						<div class="skill-header">
+							<span class="skill-name">GitHub Copilot / Cursor AI</span>
+							<span class="skill-percent">95%</span>
+						</div>
+						<div class="skill-bar">
+							<div class="skill-fill" data-width="95%"></div>
+						</div>
+					</div>
+				</div>
+
+				<!-- Cloud & Architecture -->
+				<div class="glass-card expertise-card reveal reveal-delay-2">
+					<div class="expertise-icon">☁️</div>
+					<h3>Cloud & Architecture</h3>
+					<div class="skill-item">
+						<div class="skill-header">
+							<span class="skill-name">AWS (Solutions Architect)</span>
+							<span class="skill-percent">92%</span>
+						</div>
+						<div class="skill-bar">
+							<div class="skill-fill" data-width="92%"></div>
+						</div>
+					</div>
+					<div class="skill-item">
+						<div class="skill-header">
+							<span class="skill-name">Azure Cloud</span>
+							<span class="skill-percent">80%</span>
+						</div>
+						<div class="skill-bar">
+							<div class="skill-fill" data-width="80%"></div>
+						</div>
+					</div>
+					<div class="skill-item">
+						<div class="skill-header">
+							<span class="skill-name">Microservices Architecture</span>
+							<span class="skill-percent">90%</span>
+						</div>
+						<div class="skill-bar">
+							<div class="skill-fill" data-width="90%"></div>
+						</div>
+					</div>
+					<div class="skill-item">
+						<div class="skill-header">
+							<span class="skill-name">CI/CD & DevOps</span>
+							<span class="skill-percent">88%</span>
+						</div>
+						<div class="skill-bar">
+							<div class="skill-fill" data-width="88%"></div>
+						</div>
+					</div>
+					<div class="skill-item">
+						<div class="skill-header">
+							<span class="skill-name">React Native / Mobile</span>
+							<span class="skill-percent">85%</span>
+						</div>
+						<div class="skill-bar">
+							<div class="skill-fill" data-width="85%"></div>
+						</div>
+					</div>
+				</div>
+
+				<!-- Leadership -->
+				<div class="glass-card expertise-card reveal reveal-delay-3">
+					<div class="expertise-icon">🎯</div>
+					<h3>Leadership & Delivery</h3>
+					<div class="skill-item">
+						<div class="skill-header">
+							<span class="skill-name">Program & Delivery Management</span>
+							<span class="skill-percent">95%</span>
+						</div>
+						<div class="skill-bar">
+							<div class="skill-fill" data-width="95%"></div>
+						</div>
+					</div>
+					<div class="skill-item">
+						<div class="skill-header">
+							<span class="skill-name">SAFe / Agile (CSM, SAFe 5)</span>
+							<span class="skill-percent">95%</span>
+						</div>
+						<div class="skill-bar">
+							<div class="skill-fill" data-width="95%"></div>
+						</div>
+					</div>
+					<div class="skill-item">
+						<div class="skill-header">
+							<span class="skill-name">Budget Management ($10–100M)</span>
+							<span class="skill-percent">90%</span>
+						</div>
+						<div class="skill-bar">
+							<div class="skill-fill" data-width="90%"></div>
+						</div>
+					</div>
+					<div class="skill-item">
+						<div class="skill-header">
+							<span class="skill-name">Digital Transformation</span>
+							<span class="skill-percent">92%</span>
+						</div>
+						<div class="skill-bar">
+							<div class="skill-fill" data-width="92%"></div>
+						</div>
+					</div>
+					<div class="skill-item">
+						<div class="skill-header">
+							<span class="skill-name">Vendor & Stakeholder Management</span>
+							<span class="skill-percent">90%</span>
+						</div>
+						<div class="skill-bar">
+							<div class="skill-fill" data-width="90%"></div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</section>
+
+	<!-- ======== Experience Timeline ======== -->
+	<section class="experience" id="experience">
+		<div class="container">
+			<div class="reveal">
+				<span class="section-label">Career Path</span>
+				<h2 class="section-title">Professional <span class="gradient-text">Experience</span></h2>
+				<p class="section-subtitle">15+ years of building, leading, and transforming technology organizations.
+				</p>
+			</div>
+
+			<div class="timeline">
+				<!-- EPAM -->
+				<div class="timeline-item ai-role reveal">
+					<div class="timeline-dot"></div>
+					<div class="glass-card timeline-card">
+						<div class="timeline-header">
+							<div>
+								<div class="timeline-role">AI Agentic Engineering / AI Architect
+									<span class="ai-badge">🤖 AI</span>
+								</div>
+								<div class="timeline-company">EPAM Systems</div>
+							</div>
+							<span class="timeline-date">Feb 2025 – Present</span>
+						</div>
+						<ul class="timeline-bullets">
+							<li><strong>AI Adoption Lead:</strong> Directing AI Agent deployment (BA, QA, Dev, Doc)
+								across Fortune 500 client portfolios, achieving 20–35% performance growth.</li>
+							<li><strong>SDLC Optimization:</strong> Rolled out "AI Run" services — 28% reduction in
+								lead time, 65% reduction in unit test time, 32% reduction in coding time.</li>
+							<li><strong>AI Productivity Metrics:</strong> Built dashboards using Jira, GitHub, GitLab,
+								Azure DevOps, and GitHub Copilot analytics to optimize delivery efficiency.</li>
+							<li><strong>LLM Fine-Tuning:</strong> Customizing LLMs and Stable Diffusion models for
+								project-specific needs, reducing inference time by 20%.</li>
+							<li><strong>IoT & Digital Twins:</strong> Managing IoT projects, improving deployment
+								frequency by 25% via AI Run framework.</li>
+						</ul>
+					</div>
+				</div>
+
+				<!-- Hesperis -->
+				<div class="timeline-item ai-role reveal">
+					<div class="timeline-dot"></div>
+					<div class="glass-card timeline-card">
+						<div class="timeline-header">
+							<div>
+								<div class="timeline-role">Independent Contractor — AI & eCommerce
+									<span class="ai-badge">🤖 AI</span>
+								</div>
+								<div class="timeline-company">Hesperis.ai</div>
+							</div>
+							<span class="timeline-date">May 2024 – Feb 2025</span>
+						</div>
+						<ul class="timeline-bullets">
+							<li>Led strategic Agile initiatives and AI adoption for eCommerce, resulting in 20%
+								reduction in delivery time and 15% increase in customer satisfaction.</li>
+							<li>Orchestrated cloud implementation strategies and guided teams in adopting best practices
+								for cloud-native AI solutions.</li>
+							<li>Established industry-leading development practices to elevate code quality and team
+								efficiency.</li>
+						</ul>
+					</div>
+				</div>
+
+				<!-- Levi's - Mobile -->
+				<div class="timeline-item ai-role reveal">
+					<div class="timeline-dot"></div>
+					<div class="glass-card timeline-card">
+						<div class="timeline-header">
+							<div>
+								<div class="timeline-role">Sr. Mobile Engineering Manager / AI Architect
+									<span class="ai-badge">🤖 AI</span>
+								</div>
+								<div class="timeline-company">Levi Strauss & Co.</div>
+							</div>
+							<span class="timeline-date">Oct 2022 – May 2024</span>
+						</div>
+						<ul class="timeline-bullets">
+							<li><strong>Global Mobile Delivery:</strong> Managed 30+ person distributed team across
+								Americas and India. Reduced app load time from 9s → 2s.</li>
+							<li><strong>React Native Modernization:</strong> Led Mobile Front End Architecture overhaul,
+								including React Native New Architecture rollout.</li>
+							<li><strong>Growth Impact:</strong> Increased loyalty membership to 5.4M+ users;
+								+25% visitor-to-PDP rate in US/CA, +50% in Europe.</li>
+							<li><strong>AI-Driven Search:</strong> Integrated AI-powered search, boosting cart-add rate
+								by 10% across all markets.</li>
+						</ul>
+					</div>
+				</div>
+
+				<!-- Levi's - Director -->
+				<div class="timeline-item reveal">
+					<div class="timeline-dot"></div>
+					<div class="glass-card timeline-card">
+						<div class="timeline-header">
+							<div>
+								<div class="timeline-role">Director of Information Technology</div>
+								<div class="timeline-company">Levi Strauss & Co.</div>
+							</div>
+							<span class="timeline-date">Oct 2019 – Sep 2022</span>
+						</div>
+						<ul class="timeline-bullets">
+							<li><strong>Digital Transformation:</strong> Led full IT Portfolio in Europe, adopted SAFe
+								5.0 for cross-functional IT teams, managed ERP/SAP implementation.</li>
+							<li><strong>Award-Winning eCommerce:</strong> Relaunched ru.levi.com — +470% orders growth,
+								+247% conversion rate, high-performance cloud architecture.</li>
+							<li><strong>CRM/Loyalty:</strong> 500K+ new customer registrations in 2021/22, full
+								integration with eComm and retail operations.</li>
+							<li><strong>Omnichannel:</strong> Implemented BOPIS, ROPIS, Find in Store, and loyalty
+								integration services.</li>
+						</ul>
+					</div>
+				</div>
+
+				<!-- VTB -->
+				<div class="timeline-item reveal">
+					<div class="timeline-dot"></div>
+					<div class="glass-card timeline-card">
+						<div class="timeline-header">
+							<div>
+								<div class="timeline-role">Delivery Director / Enterprise Architect</div>
+								<div class="timeline-company">VTB Bank</div>
+							</div>
+							<span class="timeline-date">Aug 2018 – Aug 2019</span>
+						</div>
+						<ul class="timeline-bullets">
+							<li>Led 12 cross-functional Agile teams (120+ personnel) delivering CRM and MDM systems for
+								10,000+ internal users.</li>
+							<li>Migrated to modern Java/PostgreSQL/React stack, enabling future scalability.</li>
+							<li>Saved $1M annually through optimized vendor negotiations and streamlined SDLC.</li>
+						</ul>
+					</div>
+				</div>
+
+				<!-- Mary Kay -->
+				<div class="timeline-item reveal">
+					<div class="timeline-dot"></div>
+					<div class="glass-card timeline-card">
+						<div class="timeline-header">
+							<div>
+								<div class="timeline-role">Applications Development Manager / Architect</div>
+								<div class="timeline-company">Mary Kay Inc.</div>
+							</div>
+							<span class="timeline-date">Jan 2008 – Aug 2018</span>
+						</div>
+						<ul class="timeline-bullets">
+							<li>Technical leadership across Europe region. Built and managed 50+ person distributed team
+								across US, Ukraine, Mexico, China, Korea.</li>
+							<li>Delivered TOP 10 eCommerce platform to USA, LATAM, and EMEA markets.</li>
+							<li>10+ successfully implemented global projects in eCommerce, Mobile, WMS, and
+								E-Business applications.</li>
+						</ul>
+					</div>
+				</div>
+
+				<!-- Dell -->
+				<div class="timeline-item reveal">
+					<div class="timeline-dot"></div>
+					<div class="glass-card timeline-card">
+						<div class="timeline-header">
+							<div>
+								<div class="timeline-role">Development Team Leader</div>
+								<div class="timeline-company">Dell Technologies</div>
+							</div>
+							<span class="timeline-date">Jun 2003 – Jan 2008</span>
+						</div>
+						<ul class="timeline-bullets">
+							<li>Led distributed development teams across multiple Dell US/EMEA enterprise eCommerce
+								projects.</li>
+							<li>Completed five major Enterprise eCommerce platform implementations.</li>
+						</ul>
+					</div>
+				</div>
+			</div>
+
+			<!-- Education -->
+			<div class="reveal" style="margin-top: 64px;">
+				<span class="section-label">Education</span>
+				<h2 class="section-title" style="font-size: 1.8rem;">Academic <span
+						class="gradient-text">Background</span></h2>
+				<div class="glass-card education-card" style="margin-top: 24px;">
+					<h3>Bauman Moscow State Technical University</h3>
+					<p class="education-degree"><strong>Ph.D., Mathematics and Computer Science</strong></p>
+					<p class="education-degree">Master of Science, Computer Science</p>
+					<p class="education-year">2000 – 2006 (PhD) · 1994 – 2000 (MSc)</p>
+				</div>
+			</div>
+		</div>
+	</section>
+
+	<!-- ======== Projects Section ======== -->
+	<section class="projects" id="projects">
+		<div class="container">
+			<div class="reveal">
+				<span class="section-label">Portfolio</span>
+				<h2 class="section-title">Key <span class="gradient-text">Projects</span></h2>
+				<p class="section-subtitle">Enterprise-scale initiatives delivering measurable AI and digital
+					transformation impact.</p>
+			</div>
+
+			<div class="projects-grid">
+				<!-- Project 1 -->
+				<div class="project-card reveal reveal-delay-1">
+					<img src="images/banner.jpeg" alt="AI Productivity Framework" class="project-image">
+					<div class="project-content">
+						<span class="project-tag">AI · SDLC · Agents</span>
+						<h3>AI Productivity Framework</h3>
+						<p>Designed and rolled out comprehensive AI adoption strategy for Fortune 500 clients at EPAM.
+							Integrated GitHub Copilot and custom AI Agents across the entire SDLC.</p>
+						<span class="project-metric">↑ 28% faster delivery · 65% test automation</span>
+					</div>
+				</div>
+
+				<!-- Project 2 -->
+				<div class="project-card reveal reveal-delay-2">
+					<img src="images/mobile.jpg" alt="Levi's Global Mobile" class="project-image">
+					<div class="project-content">
+						<span class="project-tag">Mobile · React Native · AI</span>
+						<h3>AI-Powered Global Mobile Platform</h3>
+						<p>Technological overhaul of Levi's global mobile presence. Migrated to React Native New
+							Architecture with AI-driven search, reaching 5.4M+ loyal members.</p>
+						<span class="project-metric">↑ 5.4M users · 78% faster load times</span>
+					</div>
+				</div>
+
+				<!-- Project 3 -->
+				<div class="project-card reveal reveal-delay-3">
+					<img src="images/ecomm.jpg" alt="eCommerce Transformation" class="project-image">
+					<div class="project-content">
+						<span class="project-tag">eCommerce · Cloud · Digital</span>
+						<h3>Award-Winning eCommerce Engine</h3>
+						<p>Relaunched ru.levi.com in Europe with high-performance AWS cloud architecture.
+							Full omnichannel integration with BOPIS, CRM, and loyalty programs.</p>
+						<span class="project-metric">↑ +470% orders · +247% conversion rate</span>
+					</div>
+				</div>
+
+				<!-- Project 4 -->
+				<div class="project-card reveal reveal-delay-4">
+					<img src="images/ent_apps.jpg" alt="Enterprise CRM" class="project-image">
+					<div class="project-content">
+						<span class="project-tag">Enterprise · CRM · Microservices</span>
+						<h3>Enterprise CRM & MDM Modernization</h3>
+						<p>Modernized VTB Bank's corporate systems for 10,000+ users. Led 12 Agile teams migrating
+							from monolith to modern Java/PostgreSQL microservices architecture.</p>
+						<span class="project-metric">↑ $1M saved annually · 120+ team members</span>
+					</div>
+				</div>
+			</div>
+
+			<div style="text-align: center; margin-top: 40px;" class="reveal">
+				<a href="resume_portfolio_src.html" target="_blank" class="btn btn-ghost">
+					View Full Resume & Portfolio →
+				</a>
+			</div>
+		</div>
+	</section>
+
+	<!-- ======== Contact Section ======== -->
+	<section class="contact" id="contact">
+		<div class="container">
+			<div class="reveal">
+				<span class="section-label">Get in Touch</span>
+				<h2 class="section-title">Let's <span class="gradient-text">Connect</span></h2>
+				<p class="section-subtitle">Interested in AI adoption, agentic engineering, or enterprise-scale
+					transformation? Let's talk.</p>
+			</div>
+
+			<div class="contact-grid">
+				<div class="contact-info-list reveal reveal-delay-1">
+					<div class="contact-item">
+						<div class="contact-item-icon">📧</div>
+						<a href="mailto:alexander.uspensky@gmail.com">alexander.uspensky@gmail.com</a>
+					</div>
+					<div class="contact-item">
+						<div class="contact-item-icon">📱</div>
+						<span>+52 998 406 5952</span>
+					</div>
+					<div class="contact-item">
+						<div class="contact-item-icon">📍</div>
+						<span>Cancún, Quintana Roo, Mexico</span>
+					</div>
+					<div class="contact-item">
+						<div class="contact-item-icon">🔗</div>
+						<a href="https://linkedin.com/in/uspensky" target="_blank"
+							rel="noopener">linkedin.com/in/uspensky</a>
+					</div>
+				</div>
+
+				<div class="reveal reveal-delay-2">
+					<h3 style="font-size: 1.1rem; margin-bottom: 20px; color: var(--text-secondary);">Find me on</h3>
+					<div class="social-links">
+						<a href="https://linkedin.com/in/uspensky" target="_blank" rel="noopener" class="social-link"
+							title="LinkedIn" aria-label="LinkedIn">
+							<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+								<path
+									d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
+							</svg>
+						</a>
+						<a href="https://github.com/alexander-uspenskiy" target="_blank" rel="noopener"
+							class="social-link" title="GitHub" aria-label="GitHub">
+							<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+								<path
+									d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12" />
+							</svg>
+						</a>
+						<a href="https://alexander-uspenskiy.medium.com" target="_blank" rel="noopener"
+							class="social-link" title="Medium" aria-label="Medium">
+							<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+								<path
+									d="M13.54 12a6.8 6.8 0 01-6.77 6.82A6.8 6.8 0 010 12a6.8 6.8 0 016.77-6.82A6.8 6.8 0 0113.54 12zM20.96 12c0 3.54-1.51 6.42-3.38 6.42-1.87 0-3.39-2.88-3.39-6.42s1.52-6.42 3.39-6.42 3.38 2.88 3.38 6.42M24 12c0 3.17-.53 5.75-1.19 5.75-.66 0-1.19-2.58-1.19-5.75s.53-5.75 1.19-5.75C23.47 6.25 24 8.83 24 12z" />
+							</svg>
+						</a>
+						<a href="https://dev.to/alexander_uspenskiy_the_great" target="_blank" rel="noopener"
+							class="social-link" title="Dev.to" aria-label="Dev.to">
+							<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+								<path
+									d="M7.42 10.05c-.18-.16-.46-.23-.84-.23H6v4.36h.58c.37 0 .67-.07.84-.23.17-.16.27-.45.27-.85v-2.19c0-.42-.1-.7-.27-.86zm6.58-.21c-.38 0-.6.24-.6.6v3.12c0 .36.22.6.6.6.38 0 .6-.24.6-.6v-3.12c0-.36-.22-.6-.6-.6zM0 4.94v14.12h24V4.94H0zM8.56 15.3c-.44.58-1.06.77-2.53.77H4.71V8.53h1.4c1.67 0 2.16.18 2.6.9.27.43.29.6.29 2.91s-.02 2.52-.44 2.96zm5.76-.13c-.28.52-.83.87-1.45.87-.6 0-1.18-.35-1.45-.87-.14-.27-.14-.36-.14-2.67s0-2.39.14-2.67c.28-.52.83-.87 1.45-.87.6 0 1.18.35 1.45.87.14.27.14.36.14 2.67s0 2.39-.14 2.67zm5.68-2.4H18.5v1.17c0 .49.16.7.56.7.38 0 .54-.21.54-.7v-.47h1.5v.57c0 .45-.04.63-.12.87-.27.69-.97 1.08-1.88 1.08-.94 0-1.65-.39-1.93-1.08-.1-.24-.14-.42-.14-.87V10.6c0-.47.04-.63.14-.87.28-.69.97-1.08 1.88-1.08.94 0 1.65.39 1.93 1.08.1.24.14.42.14.87v1.17z" />
+							</svg>
+						</a>
+						<a href="mailto:alexander.uspensky@gmail.com" class="social-link" title="Email"
+							aria-label="Email">
+							<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+								<path
+									d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 010 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L5.455 4.64 12 9.548l6.545-4.91 1.528-1.145C21.69 2.28 24 3.434 24 5.457z" />
+							</svg>
+						</a>
+					</div>
+
+					<div class="pub-links" style="margin-top: 32px;">
+						<a href="https://alexander-uspenskiy.medium.com" target="_blank" rel="noopener"
+							class="pub-link">
+							<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"
+								xmlns="http://www.w3.org/2000/svg">
+								<path
+									d="M13.54 12a6.8 6.8 0 01-6.77 6.82A6.8 6.8 0 010 12a6.8 6.8 0 016.77-6.82A6.8 6.8 0 0113.54 12zM20.96 12c0 3.54-1.51 6.42-3.38 6.42-1.87 0-3.39-2.88-3.39-6.42s1.52-6.42 3.39-6.42 3.38 2.88 3.38 6.42M24 12c0 3.17-.53 5.75-1.19 5.75-.66 0-1.19-2.58-1.19-5.75s.53-5.75 1.19-5.75C23.47 6.25 24 8.83 24 12z" />
+							</svg>
+							Read on Medium
+						</a>
+						<a href="https://dev.to/alexander_uspenskiy_the_great" target="_blank" rel="noopener"
+							class="pub-link">
+							<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"
+								xmlns="http://www.w3.org/2000/svg">
+								<path
+									d="M7.42 10.05c-.18-.16-.46-.23-.84-.23H6v4.36h.58c.37 0 .67-.07.84-.23.17-.16.27-.45.27-.85v-2.19c0-.42-.1-.7-.27-.86zm6.58-.21c-.38 0-.6.24-.6.6v3.12c0 .36.22.6.6.6.38 0 .6-.24.6-.6v-3.12c0-.36-.22-.6-.6-.6zM0 4.94v14.12h24V4.94H0zM8.56 15.3c-.44.58-1.06.77-2.53.77H4.71V8.53h1.4c1.67 0 2.16.18 2.6.9.27.43.29.6.29 2.91s-.02 2.52-.44 2.96zm5.76-.13c-.28.52-.83.87-1.45.87-.6 0-1.18-.35-1.45-.87-.14-.27-.14-.36-.14-2.67s0-2.39.14-2.67c.28-.52.83-.87 1.45-.87.6 0 1.18.35 1.45.87.14.27.14.36.14 2.67s0 2.39-.14 2.67zm5.68-2.4H18.5v1.17c0 .49.16.7.56.7.38 0 .54-.21.54-.7v-.47h1.5v.57c0 .45-.04.63-.12.87-.27.69-.97 1.08-1.88 1.08-.94 0-1.65-.39-1.93-1.08-.1-.24-.14-.42-.14-.87V10.6c0-.47.04-.63.14-.87.28-.69.97-1.08 1.88-1.08.94 0 1.65.39 1.93 1.08.1.24.14.42.14.87v1.17z" />
+							</svg>
+							Read on Dev.to
+						</a>
+						<a href="assets/Docs/Alex_Uspenskiy_Mobile_Portfolio.pdf" target="_blank" class="pub-link">
+							<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"
+								xmlns="http://www.w3.org/2000/svg">
+								<path
+									d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zm-1 2l5 5h-5V4zm-3 9h4v2h-4v-2zm0 3h4v2h-4v-2zm-2-3h1v2H8v-2zm0 3h1v2H8v-2z" />
+							</svg>
+							Mobile Portfolio PDF
+						</a>
+					</div>
+				</div>
+			</div>
+		</div>
+	</section>
+
+	<!-- ======== Footer ======== -->
+	<footer class="footer">
+		<div class="container">
+			<p>&copy; 2026 Alexander Uspenskiy. Built with purpose, powered by AI.</p>
+		</div>
+	</footer>
 
 	<!-- Scripts -->
-	<script src="assets/js/jquery.min.js"></script>
-	<script src="assets/js/jquery.scrollex.min.js"></script>
-	<script src="assets/js/jquery.scrolly.min.js"></script>
-	<script src="assets/js/browser.min.js"></script>
-	<script src="assets/js/breakpoints.min.js"></script>
-	<script src="assets/js/util.js"></script>
 	<script src="assets/js/main.js"></script>
 
 </body>

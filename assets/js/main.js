@@ -1,159 +1,304 @@
-/*
-	Read Only by HTML5 UP
-	html5up.net | @ajlkn
-	Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
-*/
+/* ============================================
+   Alexander Uspenskiy — AI Portfolio
+   Vanilla JS — Particles, Animations, Nav
+   ============================================ */
 
-(function($) {
+(function () {
+    'use strict';
 
-	var $window = $(window),
-		$body = $('body'),
-		$header = $('#header'),
-		$titleBar = null,
-		$nav = $('#nav'),
-		$wrapper = $('#wrapper');
+    // ---- Neural Network Particle System ----
+    class ParticleNetwork {
+        constructor(canvas) {
+            this.canvas = canvas;
+            this.ctx = canvas.getContext('2d');
+            this.particles = [];
+            this.mouse = { x: null, y: null, radius: 150 };
+            this.animationId = null;
+            this.resize();
+            this.init();
+            this.animate();
+            this.bindEvents();
+        }
 
-	// Breakpoints.
-		breakpoints({
-			xlarge:   [ '1281px',  '1680px' ],
-			large:    [ '1025px',  '1280px' ],
-			medium:   [ '737px',   '1024px' ],
-			small:    [ '481px',   '736px'  ],
-			xsmall:   [ null,      '480px'  ],
-		});
+        resize() {
+            this.canvas.width = window.innerWidth;
+            this.canvas.height = window.innerHeight;
+        }
 
-	// Play initial animations on page load.
-		$window.on('load', function() {
-			window.setTimeout(function() {
-				$body.removeClass('is-preload');
-			}, 100);
-		});
+        init() {
+            this.particles = [];
+            const density = Math.min(this.canvas.width * this.canvas.height / 12000, 120);
+            for (let i = 0; i < density; i++) {
+                this.particles.push({
+                    x: Math.random() * this.canvas.width,
+                    y: Math.random() * this.canvas.height,
+                    vx: (Math.random() - 0.5) * 0.5,
+                    vy: (Math.random() - 0.5) * 0.5,
+                    radius: Math.random() * 2 + 0.5,
+                    opacity: Math.random() * 0.5 + 0.2,
+                });
+            }
+        }
 
-	// Tweaks/fixes.
+        bindEvents() {
+            window.addEventListener('resize', () => {
+                this.resize();
+                this.init();
+            });
 
-		// Polyfill: Object fit.
-			if (!browser.canUse('object-fit')) {
+            this.canvas.addEventListener('mousemove', (e) => {
+                const rect = this.canvas.getBoundingClientRect();
+                this.mouse.x = e.clientX - rect.left;
+                this.mouse.y = e.clientY - rect.top;
+            });
 
-				$('.image[data-position]').each(function() {
+            this.canvas.addEventListener('mouseleave', () => {
+                this.mouse.x = null;
+                this.mouse.y = null;
+            });
+        }
 
-					var $this = $(this),
-						$img = $this.children('img');
+        animate() {
+            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-					// Apply img as background.
-						$this
-							.css('background-image', 'url("' + $img.attr('src') + '")')
-							.css('background-position', $this.data('position'))
-							.css('background-size', 'cover')
-							.css('background-repeat', 'no-repeat');
+            for (let i = 0; i < this.particles.length; i++) {
+                const p = this.particles[i];
 
-					// Hide img.
-						$img
-							.css('opacity', '0');
+                // Move
+                p.x += p.vx;
+                p.y += p.vy;
 
-				});
+                // Wrap edges
+                if (p.x < 0) p.x = this.canvas.width;
+                if (p.x > this.canvas.width) p.x = 0;
+                if (p.y < 0) p.y = this.canvas.height;
+                if (p.y > this.canvas.height) p.y = 0;
 
-			}
+                // Mouse interaction
+                if (this.mouse.x !== null) {
+                    const dx = p.x - this.mouse.x;
+                    const dy = p.y - this.mouse.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < this.mouse.radius) {
+                        const force = (this.mouse.radius - dist) / this.mouse.radius;
+                        p.x += dx * force * 0.02;
+                        p.y += dy * force * 0.02;
+                    }
+                }
 
-	// Header Panel.
+                // Draw particle
+                this.ctx.beginPath();
+                this.ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                this.ctx.fillStyle = `rgba(0, 212, 255, ${p.opacity})`;
+                this.ctx.fill();
 
-		// Nav.
-			var $nav_a = $nav.find('a');
+                // Connect nearby particles
+                for (let j = i + 1; j < this.particles.length; j++) {
+                    const p2 = this.particles[j];
+                    const dx = p.x - p2.x;
+                    const dy = p.y - p2.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
 
-			$nav_a
-				.addClass('scrolly')
-				.on('click', function() {
+                    if (dist < 150) {
+                        const opacity = (1 - dist / 150) * 0.15;
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(p.x, p.y);
+                        this.ctx.lineTo(p2.x, p2.y);
+                        this.ctx.strokeStyle = `rgba(99, 102, 241, ${opacity})`;
+                        this.ctx.lineWidth = 0.6;
+                        this.ctx.stroke();
+                    }
+                }
+            }
 
-					var $this = $(this);
+            this.animationId = requestAnimationFrame(() => this.animate());
+        }
 
-					// External link? Bail.
-						if ($this.attr('href').charAt(0) != '#')
-							return;
+        destroy() {
+            if (this.animationId) {
+                cancelAnimationFrame(this.animationId);
+            }
+        }
+    }
 
-					// Deactivate all links.
-						$nav_a.removeClass('active');
+    // ---- Scroll Reveal Observer ----
+    function initScrollReveal() {
+        const reveals = document.querySelectorAll('.reveal');
+        if (!reveals.length) return;
 
-					// Activate link *and* lock it (so Scrollex doesn't try to activate other links as we're scrolling to this one's section).
-						$this
-							.addClass('active')
-							.addClass('active-locked');
+        const observer = new IntersectionObserver(
+            (entries) => {
+                entries.forEach((entry) => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('visible');
+                        observer.unobserve(entry.target);
+                    }
+                });
+            },
+            { threshold: 0.1, rootMargin: '0px 0px -50px 0px' }
+        );
 
-				})
-				.each(function() {
+        reveals.forEach((el) => observer.observe(el));
+    }
 
-					var	$this = $(this),
-						id = $this.attr('href'),
-						$section = $(id);
+    // ---- Animated Counters ----
+    function initCounters() {
+        const counters = document.querySelectorAll('[data-counter]');
+        if (!counters.length) return;
 
-					// No section for this link? Bail.
-						if ($section.length < 1)
-							return;
+        const observer = new IntersectionObserver(
+            (entries) => {
+                entries.forEach((entry) => {
+                    if (entry.isIntersecting) {
+                        animateCounter(entry.target);
+                        observer.unobserve(entry.target);
+                    }
+                });
+            },
+            { threshold: 0.5 }
+        );
 
-					// Scrollex.
-						$section.scrollex({
-							mode: 'middle',
-							top: '5vh',
-							bottom: '5vh',
-							initialize: function() {
+        counters.forEach((el) => observer.observe(el));
+    }
 
-								// Deactivate section.
-									$section.addClass('inactive');
+    function animateCounter(el) {
+        const target = parseInt(el.getAttribute('data-counter'), 10);
+        const suffix = el.getAttribute('data-suffix') || '';
+        const duration = 2000;
+        const start = performance.now();
 
-							},
-							enter: function() {
+        function update(now) {
+            const elapsed = now - start;
+            const progress = Math.min(elapsed / duration, 1);
+            // Ease out cubic
+            const eased = 1 - Math.pow(1 - progress, 3);
+            const current = Math.round(eased * target);
+            el.textContent = current + suffix;
 
-								// Activate section.
-									$section.removeClass('inactive');
+            if (progress < 1) {
+                requestAnimationFrame(update);
+            }
+        }
 
-								// No locked links? Deactivate all links and activate this section's one.
-									if ($nav_a.filter('.active-locked').length == 0) {
+        requestAnimationFrame(update);
+    }
 
-										$nav_a.removeClass('active');
-										$this.addClass('active');
+    // ---- Skill Bar Animations ----
+    function initSkillBars() {
+        const bars = document.querySelectorAll('.skill-fill');
+        if (!bars.length) return;
 
-									}
+        const observer = new IntersectionObserver(
+            (entries) => {
+                entries.forEach((entry) => {
+                    if (entry.isIntersecting) {
+                        const targetWidth = entry.target.getAttribute('data-width');
+                        entry.target.style.width = targetWidth;
+                        observer.unobserve(entry.target);
+                    }
+                });
+            },
+            { threshold: 0.3 }
+        );
 
-								// Otherwise, if this section's link is the one that's locked, unlock it.
-									else if ($this.hasClass('active-locked'))
-										$this.removeClass('active-locked');
+        bars.forEach((bar) => observer.observe(bar));
+    }
 
-							}
-						});
+    // ---- Sticky Navigation ----
+    function initNav() {
+        const nav = document.querySelector('.nav');
+        if (!nav) return;
 
-				});
+        window.addEventListener('scroll', () => {
+            if (window.scrollY > 80) {
+                nav.classList.add('scrolled');
+            } else {
+                nav.classList.remove('scrolled');
+            }
+        });
 
-		// Title Bar.
-			$titleBar = $(
-				'<div id="titleBar">' +
-					'<a href="#header" class="toggle"></a>' +
-					'<span class="title">' + $('#logo').html() + '</span>' +
-				'</div>'
-			)
-				.appendTo($body);
+        // Active section highlighting
+        const sections = document.querySelectorAll('section[id]');
+        const navLinks = document.querySelectorAll('.nav-links a[href^="#"]');
 
-		// Panel.
-			$header
-				.panel({
-					delay: 500,
-					hideOnClick: true,
-					hideOnSwipe: true,
-					resetScroll: true,
-					resetForms: true,
-					side: 'right',
-					target: $body,
-					visibleClass: 'header-visible'
-				});
+        window.addEventListener('scroll', () => {
+            let current = '';
+            sections.forEach((section) => {
+                const sectionTop = section.offsetTop - 120;
+                if (window.scrollY >= sectionTop) {
+                    current = section.getAttribute('id');
+                }
+            });
 
-	// Scrolly.
-		$('.scrolly').scrolly({
-			speed: 1000,
-			offset: function() {
+            navLinks.forEach((link) => {
+                link.classList.remove('active');
+                if (link.getAttribute('href') === '#' + current) {
+                    link.classList.add('active');
+                }
+            });
+        });
 
-				if (breakpoints.active('<=medium'))
-					return $titleBar.height();
+        // Mobile menu toggle
+        const toggle = document.querySelector('.nav-toggle');
+        const links = document.querySelector('.nav-links');
 
-				return 0;
+        if (toggle && links) {
+            toggle.addEventListener('click', () => {
+                toggle.classList.toggle('active');
+                links.classList.toggle('open');
+                document.body.style.overflow = links.classList.contains('open') ? 'hidden' : '';
+            });
 
-			}
-		});
+            // Close menu on link click
+            links.querySelectorAll('a').forEach((link) => {
+                link.addEventListener('click', () => {
+                    toggle.classList.remove('active');
+                    links.classList.remove('open');
+                    document.body.style.overflow = '';
+                });
+            });
+        }
+    }
 
-})(jQuery);
+    // ---- Smooth Scroll for Anchor Links ----
+    function initSmoothScroll() {
+        document.querySelectorAll('a[href^="#"]').forEach((link) => {
+            link.addEventListener('click', (e) => {
+                const targetId = link.getAttribute('href');
+                if (targetId === '#') return;
+                const target = document.querySelector(targetId);
+                if (target) {
+                    e.preventDefault();
+                    const offset = 80;
+                    const top = target.getBoundingClientRect().top + window.scrollY - offset;
+                    window.scrollTo({ top, behavior: 'smooth' });
+                }
+            });
+        });
+    }
+
+    // ---- Initialize Everything ----
+    function init() {
+        // Particle canvas
+        const canvas = document.getElementById('particle-canvas');
+        if (canvas) {
+            new ParticleNetwork(canvas);
+        }
+
+        initNav();
+        initSmoothScroll();
+        initScrollReveal();
+        initCounters();
+        initSkillBars();
+
+        // Remove preload class after page load
+        document.body.classList.remove('is-preload');
+    }
+
+    // Wait for DOM
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+})();
