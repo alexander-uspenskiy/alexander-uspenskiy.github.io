@@ -32,12 +32,13 @@ export function createTitleScreen({ game, flow, openSettings }) {
     ...[['WASD', 'drive'], ['SPACE', 'fire'], ['E', 'weapon'], ['1-4', 'select'], ['SHIFT', 'drift'], ['C', 'camera'], ['P', 'pause'], ['M', 'mute']].map(([k, t]) => h('span', h('kbd', k), t)),
     h('span', h('kbd', '↑↓←→'), 'menus'), h('span', h('kbd', 'GAMEPAD'), 'supported'));
   const el = h('section.screen.screen-title.screen-3d',
+    h('div.ver-badge', { title: 'Game version' }, h('i'), h('span', `v${VERSION}`)),
     h('div.title-main',
       h('div.eyebrow', 'Vehicular combat league'),
       h('h1.logo', { 'aria-label': 'Last Track' }, h('span', 'LAST'), h('span.alt', 'TRACK')),
       h('p.tag', 'Race for money. Race for your life.'),
       menu),
-    h('div.title-foot', keys, h('span.ver', `v${VERSION} · three.js`)));
+    h('div.title-foot', keys, h('span.ver', 'three.js')));
   let detach = null;
   return {
     el,

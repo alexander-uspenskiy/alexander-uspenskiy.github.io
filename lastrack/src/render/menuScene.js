@@ -137,6 +137,7 @@ export function createMenuScene(host, { canvas = null } = {}) {
     disposeCar();
     try { car = buildHeroCarPBR({ carId, color: PBR_PALETTE(color), accent: 0x35e6ff, livery: spec.livery || null }); hero = car.userData.hero || null; } catch (e) { car = null; }
     if (!car) car = buildCarMesh({ carId, color, helmetColor, upgrades });
+    if (hero && hero.setLoadout && spec.weapons) hero.setLoadout(spec.weapons);   // missile hardware before the reflection copy is cloned
     car.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; if (o.isInstancedMesh) o.frustumCulled = false; } });
     turn.add(car);
     if (!lite) {
@@ -166,7 +167,8 @@ export function createMenuScene(host, { canvas = null } = {}) {
   const onWheel = (e) => { dist = Math.max(0.65, Math.min(1.5, dist + e.deltaY * 0.0008)); };
   const api = {
     get shown() { return shown; }, get car() { return car; }, get mode() { return mode; }, get lite() { return lite; },
-    setCar, setLivery(l) {
+    setCar, setLoadout(weapons) { if (hero && lastSpec) setCar({ ...lastSpec, weapons: (weapons || []).map((w) => ({ ...w })) }); },
+    setLivery(l) {
       if (!hero) return;
       lastSpec = { ...(lastSpec || {}), livery: { ...((lastSpec && lastSpec.livery) || {}), ...l } };
       hero.setLivery(l);

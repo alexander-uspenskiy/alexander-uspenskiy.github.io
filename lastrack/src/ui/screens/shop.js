@@ -12,7 +12,9 @@ export function weaponSpec(w) {
     case 'passive': return `passive · rams x${w.ramMult} dmg, takes x${w.ramTaken} · no ammo · ${slot}`;
     case 'flame': return `flame · ${(w.damage / w.cooldown).toFixed(0)} dmg/s · cone ${w.range}m · burns ammo fast · ${slot}`;
     case 'drop': return w.id === 'oil' ? `drop · slick, grip -${Math.round((1 - w.gripPenalty) * 100)}% · ${slot}` : `drop · ${w.id === 'mine' ? 'proximity blast' : 'pops tyres'} · dmg ${w.damage} · ${slot}`;
-    default: return `${w.kind} · dmg ${w.damage} · range ${w.range}m · ${slot}`;
+    default:
+      if (w.guided) return `guided · lock-on · dmg ${w.damage} · blast ${w.radius}m · range ${w.range}m · ${slot}`;
+      return `${w.kind} · dmg ${w.damage} · range ${w.range}m · ${slot}`;
   }
 }
 
@@ -24,6 +26,8 @@ export function createShopScreen({ game, flow }) {
   let detach = null, stageApi = null;
   const say = (t, bad = false) => { msg.textContent = t; msg.classList.toggle('bad', bad); };
 
+  function refreshStage() { const s = game.getSave(); game.stage?.setLoadout?.(s.weapons); }
+
   function render() {
     const save = game.getSave();
     const car = getCar(save.carId);
@@ -31,14 +35,14 @@ export function createShopScreen({ game, flow }) {
     cash.textContent = fmtMoney(save.cash);
     slots.textContent = `WEAPON SLOTS ${used}/${car.base.slots}`;
     clear(list);
-    for (const w of WEAPONS) {
+    for (const w of [...WEAPONS].sort((a, b) => a.price - b.price)) {   // cheap -> premium
       const own = save.weapons.find((x) => x.id === w.id);
       const passive = w.kind === 'passive';
       const act = own && passive
         ? button('INSTALLED', () => {}, 'btn-ammo btn-small')
         : own
-        ? button(`+${w.ammoPack} · ${fmtMoney(w.ammoPack * w.ammoPrice)}`, () => { const r = game.buy('ammo', w.id); say(r.ok ? `${w.name}: ammo loaded.` : r.error || 'Cannot buy ammo.', !r.ok); render(); }, 'btn-ammo btn-small')
-        : button(`BUY ${fmtMoney(w.price)}`, () => { const r = game.buy('weapon', w.id); say(r.ok ? `${w.name} mounted.` : r.error || 'Cannot buy.', !r.ok); render(); }, 'btn-primary btn-weapon btn-small');
+        ? button(`+${w.ammoPack} · ${fmtMoney(w.ammoPack * w.ammoPrice)}`, () => { const r = game.buy('ammo', w.id); say(r.ok ? `${w.name}: ammo loaded.` : r.error || 'Cannot buy ammo.', !r.ok); render(); if (r.ok) refreshStage(); }, 'btn-ammo btn-small')
+        : button(`BUY ${fmtMoney(w.price)}`, () => { const r = game.buy('weapon', w.id); say(r.ok ? `${w.name} mounted.` : r.error || 'Cannot buy.', !r.ok); render(); if (r.ok) refreshStage(); }, 'btn-primary btn-weapon btn-small');
       act.dataset.weapon = w.id;
       act.disabled = own && passive ? true : own ? (own.ammo >= w.maxAmmo || save.cash < w.ammoPack * w.ammoPrice) : save.cash < w.price;
       const ammo = own && !passive ? h('div.ammo-meter', h('span', `AMMO ${own.ammo}/${w.maxAmmo}`), h('div.bar-track', h('div.bar-fill', { style: { width: pct(own.ammo, w.maxAmmo) + '%' } }))) : h('div.ammo-meter', h('span', passive ? (own ? 'ON' : 'PASSIVE') : `${fmtMoney(w.ammoPrice)}/rd · pack ${w.ammoPack}`));

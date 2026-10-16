@@ -154,7 +154,7 @@ function combat(car, ctx, out, ai) {
     if (i < 0 || !ok) return false;
     const d = getWeapon(id);
     // heavy weapons are rationed so a whole grid is not wiped out in the first lap
-    const gap = d.kind === 'hitscan' || d.kind === 'flame' ? 0 : d.homing > 0 ? 40 : d.id === 'mine' ? 9 : d.kind === 'drop' ? 6 : 10;
+    const gap = d.kind === 'hitscan' || d.kind === 'flame' ? 0 : d.guided ? 16 : d.homing > 0 ? 40 : d.id === 'mine' ? 9 : d.kind === 'drop' ? 6 : 10;
     if (gap > 0 && ctx.t - (ai.lastUse[id] ?? 0) < gap * (1.3 - ai.aggression)) return false;
     ai.lastUse[id] = ctx.t;
     out.selectWeapon = i; out.fire = true; return true;
@@ -173,6 +173,7 @@ function combat(car, ctx, out, ai) {
     if (d.kind === 'flame') return ahead.fx < d.range - 1 && Math.abs(ahead.ly) < ahead.fx * Math.tan(d.cone) + 1.2 && choose(id, true);
     const range = d.range || 100;
     if (ahead.fx > range * 0.9) return false;
+    if (d.guided) return ahead.fx > 25 && Math.abs(ahead.ly) < ahead.fx * 0.4 + 1.5 && choose(id, true);
     if (d.homing > 0) return ahead.fx > 20 && Math.abs(ahead.ly) < ahead.fx * 0.35 + 1.5 && choose(id, true);
     if (d.kind === 'projectile') return ahead.fx > 14 && Math.abs(ahead.ly) < ahead.fx * 0.1 + 1.6 && choose(id, true);
     return Math.abs(ahead.ly) < ahead.fx * 0.06 + 1.4 && choose(id, true);   // hitscan

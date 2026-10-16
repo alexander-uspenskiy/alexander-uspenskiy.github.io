@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { mergeGeo, xf, roundedBox, ribbon, tube, triCount, clamp, smoothstep, lerp } from './geo.js';
 import { buildBodyGeometries, applyDents, buildCanopy, buildRoofPanel, canopyPoint, sectionAt, WHEELS, CAN_NU, CAN_NX } from './carBody.js';
 import { zoneFrames } from './carBody.js';
+import { createMissileRig } from './missilePods.js';
 import { getPaint } from '../../data/liveries.js';
 import { composeBodyDecals, composeRoofDecals } from '../decalArt.js';
 import { flakeNormal, carbonMaps, treadNormal, brushedMaps, glowSprite } from './maps.js';
@@ -416,6 +417,9 @@ export function buildHeroCarPBR({ color = 0xc8501a, accent = 0x35e6ff, number = 
   if (carId === 'wasp') { const ex = interceptorExtras(); extras.push(mesh(ex.carbon, mats.carbon, 'extras-carbon'), mesh(ex.glow, mats.head, 'extras-blades', false)); mats.head.color.setRGB(1.2, 2.0, 2.6); }
   if (carId === 'bulwark') { const ex = juggernautExtras(); extras.push(mesh(ex.metal, mats.gun, 'extras-armour')); }
   for (const e of extras) sprung.add(e);
+  // missile hardware (rocket box / guided pods / terminator rails): follows the loadout + ammo, sheds with the roof / side armour
+  const podMat = new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0.55, roughness: 0.4, side: THREE.DoubleSide, envMapIntensity: 1.2 }); mats.pods = podMat;
+  const rig = createMissileRig({ carId, parent: sprung, material: podMat, flashMat: mats.flash });
   // thruster flames
   const flameG = flameCone(0.1, 1.1), flames = V.thrusters.map(([x, y, z]) => { const f = new THREE.Mesh(flameG, mats.flame); f.position.set(x - 0.02, y, z); f.visible = false; sprung.add(f); return f; });
 
@@ -488,6 +492,7 @@ export function buildHeroCarPBR({ color = 0xc8501a, accent = 0x35e6ff, number = 
   }
   function update(st, dt, opts = {}) {
     dt = clamp(dt, 0, 0.1); S.dt = dt; S.t += dt;
+    if (st.weapons) rig.sync(st.weapons, S.lost, !!opts.far, dt);
     const look = damageLook(st.frac ?? 1, !!st.wrecked);
     const dmg = st.dmg || [0, 0, 0, 0], key = dentKey(dmg, look.crush);
     if (key !== S.dentKey || look.stage !== S.stage) {
@@ -546,6 +551,9 @@ export function buildHeroCarPBR({ color = 0xc8501a, accent = 0x35e6ff, number = 
   const api = {
     update, S, mats, uniforms: uni, look: damageLook,
     setLivery,
+    /** garage / shop / roster previews: show the hardware for a loadout ([{ id, ammo }]) right away. */
+    setLoadout(weapons) { rig.sync(weapons || [], S.lost, false, 0); },
+    rig,
     setPartLost(part, lost = true) { S.lost[part] = !!lost; },
     get lostParts() { return Object.keys(S.lost).filter((k) => S.lost[k]); },
     get stage() { return S.stage; },
@@ -556,7 +564,7 @@ export function buildHeroCarPBR({ color = 0xc8501a, accent = 0x35e6ff, number = 
     dispose() { for (const t of [bodyTex, roofTex, blank]) if (t) t.dispose(); const geos = new Set(); root.traverse((o) => { if (o.geometry) geos.add(o.geometry); }); geos.forEach((g) => g.dispose()); Object.values(mats).forEach((m) => m.dispose()); },
   };
   const triTotal = () => all().reduce((n, o) => n + triCount(o.geometry) * (o.isInstancedMesh ? 4 : 1), 0) + triCount(fire.children[0].geometry) * 3;
-  root.userData = { carId, variant: carId, hero: api, pbr: true, wheels: [], frontPivots: [], wheelRadius: WR, body, sprung, length: V.length, width: V.width, wrecked: false, drawCalls: all().length + 3, triCount: triTotal };
+  root.userData = { carId, variant: carId, hero: api, pbr: true, wheels: [], frontPivots: [], wheelRadius: WR, body, sprung, length: V.length, width: V.width, wrecked: false, get drawCalls() { return all().length + 3 + rig.drawCalls(); }, triCount: triTotal };
   body.userData.cast = hood.userData.cast = true;
   if (livery) setLivery(livery);
   return root;

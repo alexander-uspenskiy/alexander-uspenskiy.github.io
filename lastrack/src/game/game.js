@@ -24,6 +24,7 @@ import { createFlowMachine } from '../ui/flowMachine.js';
 import { createInput } from '../ui/input.js';
 import { createTouchControls } from '../ui/touchControls.js';
 import { createHud } from '../ui/hud.js';
+import { createOverlays } from '../ui/overlays.js';
 import { h } from '../ui/dom.js';
 import { createTitleScreen } from '../ui/screens/title.js';
 import { createCarSelectScreen } from '../ui/screens/carSelect.js';
@@ -181,6 +182,7 @@ export function createGame({ root, canvas, storage, onError = () => {}, quality 
       audio.setMusicVolume?.(settings.music); audio.setSfxVolume?.(settings.sfx);
     }
     if (pbr && prev && prev.quality !== settings.quality) { pbr.setQuality(settings.quality); stage?.setQuality(settings.quality); }
+    overlays.setEnabled(settings.nameplates);
     if (controller && prev && prev.camera !== settings.camera) controller.setCamera(settings.camera);
   }
   game.updateSettings = (patch) => {
@@ -195,6 +197,9 @@ export function createGame({ root, canvas, storage, onError = () => {}, quality 
   // ---------- HUD / input / touch ----------
   const hud = createHud({ root, getWeapon });
   game.hud = hud;
+  const overlays = createOverlays({ root });
+  overlays.setEnabled(settings.nameplates);
+  game.overlays = overlays;
   game.audio = audio;
   const input = createInput({ isRaceActive: () => flow.state === 'race', onAction: (a) => handleAction(a) });
   game.input = input;
@@ -235,7 +240,7 @@ export function createGame({ root, canvas, storage, onError = () => {}, quality 
     try { controller?.dispose(); } catch (e) { reportError(e); }
     controller = null;
     audio?.stop();
-    hud.end();
+    hud.end(); overlays.clear();
     sim = null; snapA = snapB = null;
   }
 
@@ -349,6 +354,7 @@ export function createGame({ root, canvas, storage, onError = () => {}, quality 
       const me = snapB.cars[0];
       if (controller) { controller.update(snapA, snapB, acc, dt); host.render(); }
       hud.update(snapB);
+      if (host && controller) overlays.update(snapB, host.camera, canvas.clientWidth, canvas.clientHeight, dt, controller.poseOf);
       audio?.update(snapB, dt);
       if (sim.isOver()) finishRace();
       else if (me && me.finished) { endTimer += dt; if (endTimer >= END_DELAY) finishRace(); }

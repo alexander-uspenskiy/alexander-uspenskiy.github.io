@@ -69,6 +69,13 @@ export const WEAPON_ICONS = {
     { d: 'M17.4 4.8v2M17.4 17.2v2M10.4 12h.8M23.4 12h-.4' , opacity: 0.8 },
     { d: ring(17.4, 12, 1), ...SOLID },
   ] },
+  // Sleek missile with a seeker dome inside corner lock brackets.
+  guided: { viewBox: VB, paths: [
+    { d: 'M5 12h8.4c1.8 0 3.2-.5 4.6-1.4v2.8C16.6 12.5 15.2 12 13.4 12z' },
+    { d: 'M7 12l-2.2-2.6M7 12l-2.2 2.6' },
+    { d: 'M3 4.5h3.5M3 4.5V8M21 4.5h-3.5M21 4.5V8M3 19.5h3.5M3 19.5V16M21 19.5h-3.5M21 19.5V16', opacity: 0.85 },
+    { d: ring(18.2, 12, 1), ...SOLID },
+  ] },
   // Spiked disc mine, top view.
   mine: { viewBox: VB, paths: [
     { d: ring(12, 12, 5.2) },

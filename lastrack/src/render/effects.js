@@ -116,6 +116,17 @@ function rocketGeometry(big) {
   b.box(-0.5 * s, 0, 0, 0.3 * s, 0.5 * s, 0.05, K.darkGrey);
   return b.build();
 }
+function guidedGeometry() {
+  const b = new MeshBuilder();
+  b.cyl(0, 0, 0, 0.12, 0.12, 1.25, 'x', 6, K.lightGrey);
+  b.cyl(0.72, 0, 0, 0.12, 0.05, 0.3, 'x', 6, K.sky);        // seeker dome
+  b.cyl(-0.45, 0, 0, 0.14, 0.14, 0.12, 'x', 6, K.sky);      // guidance band
+  b.box(-0.55, 0, 0, 0.32, 0.05, 0.62, K.darkGrey);
+  b.box(-0.55, 0, 0, 0.32, 0.62, 0.05, K.darkGrey);
+  b.box(0.15, 0, 0, 0.2, 0.04, 0.34, K.darkGrey);
+  b.box(0.15, 0, 0, 0.2, 0.34, 0.04, K.darkGrey);
+  return b.build();
+}
 function caltropGeometry() {
   const b = new MeshBuilder();
   for (let i = 0; i < 7; i++) { const a = i * 2.4; b.spike(Math.cos(a) * (0.3 + i * 0.12), 0, Math.sin(a) * (0.3 + i * 0.12), 0.1, 0.3, i % 2 ? K.lightGrey : K.darkGrey); }
@@ -210,13 +221,13 @@ export function createEffects(parent, { skid = true, soft = false } = {}) {
 
   // shared dynamic-object geometry / materials
   const lit = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
-  const geoRocket = rocketGeometry(false), geoTerm = rocketGeometry(true), geoCal = caltropGeometry(), geoWreck = wreckGeometry(), geoMine = mineGeometry();
+  const geoRocket = rocketGeometry(false), geoTerm = rocketGeometry(true), geoGuided = guidedGeometry(), geoCal = caltropGeometry(), geoWreck = wreckGeometry(), geoMine = mineGeometry();
   const geoLamp = new THREE.CylinderGeometry(0.2, 0.2, 0.12, 6), geoPuddle = new THREE.CircleGeometry(1, 14);
   const lampOn = basic(K.red), lampOff = basic(K.plum), lampArmed = basic(K.yellow);
   const puddleMats = [basic(K.black), basic(K.navy), basic(K.lavender)];
   puddleMats.forEach((m) => { m.polygonOffset = true; m.polygonOffsetFactor = -1; m.polygonOffsetUnits = -1; });
   const geoPick = { ammo: pickupGeometry('ammo'), repair: pickupGeometry('repair'), cash: pickupGeometry('cash') };
-  const shared = [geoRocket, geoTerm, geoCal, geoWreck, geoMine, geoLamp, geoPuddle, exGeo, ...Object.values(geoPick), trGeo];
+  const shared = [geoRocket, geoTerm, geoGuided, geoCal, geoWreck, geoMine, geoLamp, geoPuddle, exGeo, ...Object.values(geoPick), trGeo];
   const projMeshes = new Map(); // id -> {mesh, seen}
   const hazMeshes = new Map();
   const pickMeshes = new Map();
@@ -324,7 +335,7 @@ export function createEffects(parent, { skid = true, soft = false } = {}) {
           parts.emit(p.x + c * 2.4, 0.7, p.y + s * 2.4, c * 8, 0.5, s * 8, 0.07, 1.1, 0, K.yellow);
           parts.emit(p.x + c * 2.4, 0.7, p.y + s * 2.4, c * 4, 0.5, s * 4, 0.05, 0.7, 0, K.white);
           }
-        } else if (ev.weaponId === 'rocket' || ev.weaponId === 'terminator') {
+        } else if (ev.weaponId === 'rocket' || ev.weaponId === 'terminator' || ev.weaponId === 'guided') {
           for (let i = 0; i < 6; i++) parts.emit(p.x + c * 2, 0.8, p.y + s * 2, c * 6 + (Math.random() - 0.5) * 3, 0.5, s * 6 + (Math.random() - 0.5) * 3, 0.35, 1.2, 1, i % 2 ? K.orange : K.white, 0, 2);
         }
       } else if (ev.type === 'explosion') {
@@ -378,13 +389,18 @@ export function createEffects(parent, { skid = true, soft = false } = {}) {
     for (const p of snap.projectiles || []) {
       let e = projMeshes.get(p.id);
       if (!e) {
-        const mesh = new THREE.Mesh(p.type === 'terminator' ? geoTerm : geoRocket, lit); root.add(mesh);
+        const mesh = new THREE.Mesh(p.type === 'terminator' ? geoTerm : p.type === 'guided' ? geoGuided : geoRocket, lit); root.add(mesh);
         e = { mesh, seen: true }; projMeshes.set(p.id, e);
       }
       e.seen = true;
       e.mesh.position.set(p.x, 0.9, p.y); e.mesh.rotation.y = -p.heading;
       const c = Math.cos(p.heading), s = Math.sin(p.heading);
       // trail (two particles per frame, flame + smoke)
+      if (p.type === 'guided') {   // glowing exhaust: white-hot core + cyan plume, long smoke trail
+        parts.emit(p.x - c * 0.85, 0.9, p.y - s * 0.85, -c * 4, 0, -s * 4, 0.12, 0.8, 0, K.white);
+        parts.emit(p.x - c * 1.0, 0.9, p.y - s * 1.0, -c * 5, 0, -s * 5, 0.28, 1.35, 0, K.sky);
+        parts.emit(p.x - c * 1.6, 0.9, p.y - s * 1.6, 0, 0.35, 0, 1.5, 1.0, 1.1, K.lightGrey, 0.5, 1);
+      } else
       parts.emit(p.x - c * 0.9, 0.9, p.y - s * 0.9, -c * 3, 0, -s * 3, 0.25, 1.1, 0, p.type === 'terminator' ? K.red : K.orange);
       parts.emit(p.x - c * 1.3, 0.9, p.y - s * 1.3, 0, 0.6, 0, 0.8, 1.0, 1.4, K.lightGrey, 0.4, 1);
     }

@@ -30,7 +30,7 @@ export function createCarSelectScreen({ game, flow }) {
     weaponsEl.replaceChildren(h('span.muted.small', 'STARTS WITH'), ...c.startWeapons.map((w) => h('span.wchip', weaponIcon(w.id, { size: 18 }), `${getWeapon(w.id)?.name ?? w.id} ×${w.ammo}`)));
     STATS.forEach(([, key, max], n) => bars[n].set(c.base[key], max, key === 'maxSpeed' ? Math.round(c.base[key] * 3.6) + ' kph' : key === 'grip' ? c.base[key].toFixed(2) : undefined));
     tabs.forEach((d, n) => d.classList.toggle('on', n === idx));
-    try { stageApi?.show({ carId: c.id, color: c.color, upgrades: { armor: 0, engine: 0, tyres: 0 }, livery: game.liveryOf(c.id) }); } catch (e) { game.reportError(e); }
+    try { stageApi?.show({ carId: c.id, color: c.color, upgrades: { armor: 0, engine: 0, tyres: 0 }, livery: game.liveryOf(c.id), weapons: c.startWeapons }); } catch (e) { game.reportError(e); }
     renderSwatches();
   }
   const sw = h('div.swatches');

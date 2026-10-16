@@ -1,6 +1,6 @@
 // Impact feel: pure mapping from sim events to screen shake / hit-stop / slow-mo, plus the time scaler that applies them.
 // Real-time only (never feeds the sim): game.js multiplies the sim's frame time by TimeScaler.scale.
-const HEAVY = new Set(['rocket', 'terminator', 'mine']);
+const HEAVY = new Set(['rocket', 'guided', 'terminator', 'mine']);
 const clamp = (x, lo, hi) => (x < lo ? lo : x > hi ? hi : x);
 
 /**

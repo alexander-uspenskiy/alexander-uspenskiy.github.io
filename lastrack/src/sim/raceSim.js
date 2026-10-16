@@ -8,6 +8,8 @@ import { getDriver } from '../data/drivers.js';
 import { SIM_DT, createCarBody, stepBody } from './carPhysics.js';
 import { initDamage, applyDamage, damageZone, addZoneDamage, popTyres, updateDamage, damageMods, isSmoking, isBurning, repair } from './damage.js';
 import { initWeapons, tryFire, cycleWeapon, selectWeapon, tickCooldowns, addAmmo } from './weapons.js';
+import { updateLock } from './lockOn.js';
+import { getWeapon } from '../data/weapons.js';
 import { createProjectileSystem, createHazardSystem } from './projectiles.js';
 import { resolveWall, softEdge, wallDamage, resolveCarCar, pointCarDistance } from './collisions.js';
 import { newlyLost, remainingParts, PART_ORIGIN } from './parts.js';
@@ -157,10 +159,13 @@ export function createRaceSim(config, opts = {}) {
       if (car.wrecked) inp = { throttle: 0, brake: 1, steer: 0 };
       else inp = carInput(car, pin, racing);
       car.firing = false;
+      if (car.wrecked && car.lock) updateLock(car, cars, null, dt);
       if (racing && !car.wrecked) {
         if (inp.selectWeapon !== null && inp.selectWeapon !== undefined) selectWeapon(car, inp.selectWeapon);
         if (inp.cycleWeapon && !car.cycleHeld) cycleWeapon(car);
         car.cycleHeld = !!inp.cycleWeapon;
+        const aw = car.weapons[car.activeWeapon];
+        updateLock(car, cars, aw ? getWeapon(aw.id) : null, dt);
         if (inp.fire) car.firing = tryFire(car, fireCtx);
       }
       const mods = damageMods(car);
@@ -257,13 +262,14 @@ export function createRaceSim(config, opts = {}) {
         armor: c.armor, armorMax: c.armorMax, wrecked: c.wrecked, wreckT: c.wrecked ? c.wreckTimer : 0, smoke: isSmoking(c), burning: isBurning(c), tyresPopped: c.tyreTimer > 0, oiled: c.oilTimer > 0,
         lap: director.lapOf(c), s: director.sOf(c), position: c.rank, finished: c.finished, finishTime: c.finishTime, kills: c.kills,
         weapons: c.weapons.map((w) => ({ id: w.id, ammo: w.ammo })), activeWeapon: c.activeWeapon, firing: c.firing,
+        lock: c.lock && c.lock.target ? { id: c.lock.target.id, t: c.lock.t, locked: c.lock.locked } : null,
         color: c.color, helmetColor: c.helmetColor, livery: c.livery,
         gear: c.gear, rpm: c.rpm, limiter: c.limiter, shifted: c.shifted, ax: c.ax, ay: c.ay, load: c.load, slip: c.slip,
         wheelspin: c.wheelspin, braking: c.braking, surface: c.surface, throttle: c.throttleIn ?? 0,
         dmg: c.dmgMap ? c.dmgMap.slice() : null,
         nitro: c.nitro, nitroOn: c.nitroOn, drift: c.drift, boost: c.boost, parts: c.partsLost ? c.partsLost.slice() : [],
       })),
-      projectiles: projectiles.list.map((p) => ({ id: p.id, type: p.def.id, x: p.x, y: p.y, heading: p.heading, ownerId: p.owner.id })),
+      projectiles: projectiles.list.map((p) => ({ id: p.id, type: p.def.id, x: p.x, y: p.y, heading: p.heading, ownerId: p.owner.id, targetId: p.target ? p.target.id : null })),
       hazards: [
         ...hazards.list.map((h) => ({ id: h.id, type: h.type, x: h.x, y: h.y, heading: h.heading, ...(h.type === 'mine' ? { armed: h.age >= (h.def.armTime ?? 1) } : {}) })),
         ...cars.filter((c) => c.wrecked && c.wreckTimer > 0).map((c) => ({ id: 'w' + c.id, type: 'wreck', x: c.x, y: c.y, heading: c.heading })),

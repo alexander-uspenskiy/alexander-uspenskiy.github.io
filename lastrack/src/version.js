@@ -1,2 +1,2 @@
 // Keep in sync with package.json (tests/ui/menu.test.js checks it).
-export const VERSION = '0.2.0';
+export const VERSION = '0.3.0';

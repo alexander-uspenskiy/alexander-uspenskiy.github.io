@@ -297,3 +297,20 @@ html.touch .tc, body.touch .tc { display: flex; }
   .tc .tc-aux .tc-btn { width: 52px; height: 34px; }
 }
 @media (prefers-reduced-motion: reduce) { .tc .tc-btn { transition: none; } }
+
+/* world-anchored overlays: competitor nameplates + guided-missile lock reticle */
+.overlay-layer{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:2}
+.np{position:absolute;left:0;top:0;visibility:hidden;opacity:0;will-change:transform,opacity;display:flex;flex-direction:column;align-items:center;gap:3px;min-width:92px;--acc:#8ff}
+.np-row{display:flex;align-items:center;gap:5px;padding:2px 9px;border-radius:3px;background:rgba(6,10,18,.62);border-left:2px solid var(--acc);backdrop-filter:blur(3px)}
+.np-name{font:700 12px/1.1 'Rajdhani','Segoe UI',system-ui,sans-serif;letter-spacing:.09em;text-transform:uppercase;color:var(--acc);text-shadow:0 0 6px rgba(0,0,0,.9),0 1px 2px #000;white-space:nowrap}
+.np-skull{display:none;color:#ff5a4a;line-height:0}
+.np.dead .np-skull{display:inline-block}.np.dead .np-name{color:#aab;opacity:.75}
+.np-bar{width:92px;height:4px;border-radius:2px;background:rgba(0,0,0,.6);box-shadow:0 0 0 1px rgba(255,255,255,.14);overflow:hidden}
+.np-fill{height:100%;width:100%;transition:width .12s linear}
+.lock-reticle{position:absolute;left:0;top:0;visibility:hidden;width:120px;height:120px;will-change:transform,width,height;color:#ffd24a;filter:drop-shadow(0 0 5px currentColor)}
+.lock-reticle.locked{color:#ff3b3b;animation:lockpulse .35s ease-in-out infinite alternate}
+.lock-reticle b{position:absolute;width:22%;height:22%;border:0 solid currentColor}
+.lock-reticle b:nth-child(1){left:0;top:0;border-width:2px 0 0 2px}.lock-reticle b:nth-child(2){right:0;top:0;border-width:2px 2px 0 0}
+.lock-reticle b:nth-child(3){left:0;bottom:0;border-width:0 0 2px 2px}.lock-reticle b:nth-child(4){right:0;bottom:0;border-width:0 2px 2px 0}
+.lock-reticle span{position:absolute;left:50%;top:100%;transform:translateX(-50%);margin-top:4px;font:700 11px/1 'Rajdhani',system-ui,sans-serif;letter-spacing:.2em}
+@keyframes lockpulse{from{opacity:.65}to{opacity:1}}

@@ -372,3 +372,8 @@ body.no-hints .keys { display: none; }
 .row.wrap { flex-wrap: wrap; gap: 6px; } .num-input { width: 64px; font: inherit; font-size: 22px; text-align: center; background: rgba(5,18,28,.8); color: #e8f4ff; border: 1px solid #35e6ff; border-radius: 8px; padding: 4px; }
 .livery-strip { display: flex; align-items: center; gap: 6px; margin: 4px 0; font-size: 12px; } .livery-strip i { width: 14px; height: 14px; border-radius: 50%; display: inline-block; border: 1px solid rgba(255,255,255,.4); }
 .livery-strip .dchip { padding: 1px 6px; border-radius: 6px; background: rgba(255,255,255,.08); font-size: 11px; }
+
+/* version badge (title screen, top-left) */
+.screen-title .ver-badge{position:absolute;top:18px;left:22px;display:flex;align-items:center;gap:8px;padding:5px 12px 5px 10px;border-radius:999px;
+  background:rgba(8,14,24,.55);border:1px solid rgba(120,220,255,.28);backdrop-filter:blur(8px);font:600 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.12em;color:#bfefff;z-index:5;pointer-events:none}
+.screen-title .ver-badge i{width:7px;height:7px;border-radius:50%;background:#37f3b0;box-shadow:0 0 8px #37f3b0}

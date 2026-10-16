@@ -2,6 +2,7 @@
 import { getWeapon } from '../data/weapons.js';
 import { rayCar } from './collisions.js';
 import { wrapAngle } from '../core/mathUtil.js';
+import { launchTarget, newLock } from './lockOn.js';
 
 export const DROP_LIFE = 20;
 
@@ -14,6 +15,7 @@ export function initWeapons(car, loadout) {
   car.ramMult = plate ? plate.ramMult : 1;
   car.ramTaken = plate ? plate.ramTaken ?? 1 : 1;
   car.cooldowns = car.weapons.map(() => 0);
+  car.lock = newLock();
   car.firing = false;
   car.fireHeld = false;
   car.cycleHeld = false;
@@ -78,7 +80,8 @@ export function tryFire(car, ctx) {
   } else if (def.kind === 'projectile') {
     ctx.emit('shot', { carId: car.id, weaponId: def.id, x: nx, y: ny });
     const ang = car.heading + (ctx.rng() * 2 - 1) * (def.spread || 0);
-    ctx.projectiles.spawn({ def, owner: car, x: nx, y: ny, heading: ang, carSpeed: Math.max(0, car.u) });
+    const target = def.guided ? launchTarget(car, ctx.cars, def) : null;
+    ctx.projectiles.spawn({ def, owner: car, x: nx, y: ny, heading: ang, carSpeed: Math.max(0, car.u), target });
   } else if (def.kind === 'flame') {
     ctx.emit('flame', { carId: car.id, weaponId: def.id, x: nx, y: ny, heading: car.heading, range: def.range, cone: def.cone });
     for (const o of ctx.cars) {

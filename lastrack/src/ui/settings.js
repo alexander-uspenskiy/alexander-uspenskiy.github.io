@@ -1,6 +1,6 @@
 // Player settings (quality, volumes, mute, hints, camera). Pure normalise + storage; apply() wires them to the game.
 export const SETTINGS_KEY = 'lasttrack.settings';
-export const DEFAULT_SETTINGS = Object.freeze({ quality: 'med', master: 0.7, music: 0.8, sfx: 0.9, muted: false, hints: true, camera: 'chase' });
+export const DEFAULT_SETTINGS = Object.freeze({ quality: 'med', master: 0.7, music: 0.8, sfx: 0.9, muted: false, hints: true, nameplates: true, camera: 'chase' });
 export const QUALITIES = ['low', 'med', 'high'];
 export const CAMERAS = ['chase', 'cockpit', 'bumper', 'tv', 'top'];
 const clamp01 = (v, d) => (Number.isFinite(+v) && v !== null && v !== '' ? Math.max(0, Math.min(1, +v)) : d);
@@ -13,6 +13,7 @@ export function normalizeSettings(raw) {
     master: clamp01(r.master, d.master), music: clamp01(r.music, d.music), sfx: clamp01(r.sfx, d.sfx),
     muted: typeof r.muted === 'boolean' ? r.muted : d.muted,
     hints: typeof r.hints === 'boolean' ? r.hints : d.hints,
+    nameplates: typeof r.nameplates === 'boolean' ? r.nameplates : d.nameplates,
     camera: CAMERAS.includes(r.camera) ? r.camera : d.camera,
   };
 }

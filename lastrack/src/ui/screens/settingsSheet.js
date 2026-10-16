@@ -30,7 +30,7 @@ export function createSettingsSheet({ game }) {
       const r = rows[k]; r.input.value = Math.round(s[k] * 100); r.val.textContent = Math.round(s[k] * 100); r.input.style.setProperty('--v', Math.round(s[k] * 100) + '%');
     }
     for (const k of ['quality', 'camera']) rows[k].btns.forEach((b, i) => b.classList.toggle('on', rows[k].values[i] === s[k]));
-    for (const k of ['muted', 'hints']) rows[k].sw.setAttribute('aria-checked', String(!!s[k]));
+    for (const k of ['muted', 'hints', 'nameplates']) rows[k].sw.setAttribute('aria-checked', String(!!s[k]));
   }
   const closeBtn = button('DONE', () => api.close(), 'btn-primary btn-back');
   const sheet = h('div.panel.sheet', { role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Settings' },
@@ -39,6 +39,7 @@ export function createSettingsSheet({ game }) {
     slider('master', 'MASTER VOLUME'), slider('music', 'MUSIC'), slider('sfx', 'SFX'),
     toggle('muted', 'MUTE ALL'),
     toggle('hints', 'CONTROL HINTS'),
+    toggle('nameplates', 'RIVAL NAMEPLATES'),
     h('div.setting-row', h('label', 'DEFAULT CAMERA'), h('div.ctl', seg('camera', CAMERAS, CAMERA_LABEL))),
     h('p.muted.small', 'G cycles quality · C cycles camera · M mutes during a race. Settings are saved on this device.'),
     h('div.row.center', closeBtn));

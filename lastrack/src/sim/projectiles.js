@@ -7,6 +7,7 @@ const HIT_RADIUS = 0.6;           // extra reach on top of the car circles
 const OWNER_SAFE = 0.25;          // s before a projectile can hit its owner (it can still never hit it directly)
 const HOMING_CONE = (25 * Math.PI) / 180;
 const HOMING_RANGE = 120;
+const GUIDED_COAST = 0.12;       // s a guided missile flies straight off the rail before it steers
 const DROP_OWNER_SAFE = 1;
 const CALTROP_RADIUS = 1.8;
 const MINE_OWNER_SAFE = 3;
@@ -16,10 +17,10 @@ export function createProjectileSystem(env) {
   const list = [];
   return {
     list,
-    spawn({ def, owner, x, y, heading, carSpeed }) {
+    spawn({ def, owner, x, y, heading, carSpeed, target = null }) {
       list.push({
         id: env.nextId(), def, owner, x, y, heading, speed: (def.speed || 80) + 0.0 * carSpeed,
-        life: def.life || 3, age: 0, target: null,
+        life: def.life || 3, age: 0, target,
       });
     },
     update(dt) {
@@ -28,8 +29,8 @@ export function createProjectileSystem(env) {
         p.age += dt; p.life -= dt;
         const def = p.def;
         if (def.homing > 0) {
-          if (!p.target || p.target.wrecked) p.target = acquire(p, env.cars);
-          if (p.target) {
+          if (!p.target || p.target.wrecked) p.target = acquire(p, env.cars, def.guided);
+          if (p.target && !(def.guided && p.age < GUIDED_COAST)) {
             const want = Math.atan2(p.target.y - p.y, p.target.x - p.x);
             const diff = wrapAngle(want - p.heading);
             const maxTurn = def.homing * dt;
@@ -64,14 +65,15 @@ export function createProjectileSystem(env) {
   };
 }
 
-function acquire(p, cars) {
+function acquire(p, cars, wide) {
+  const cone = wide ? HOMING_CONE * 2.2 : HOMING_CONE;
   let best = null, bd = Infinity;
   for (const c of cars) {
     if (c === p.owner || c.wrecked) continue;
     const dx = c.x - p.x, dy = c.y - p.y;
     const d = Math.hypot(dx, dy);
     if (d > HOMING_RANGE || d < 1) continue;
-    if (Math.abs(wrapAngle(Math.atan2(dy, dx) - p.heading)) > HOMING_CONE) continue;
+    if (Math.abs(wrapAngle(Math.atan2(dy, dx) - p.heading)) > cone) continue;
     if (d < bd) { bd = d; best = c; }
   }
   return best;
