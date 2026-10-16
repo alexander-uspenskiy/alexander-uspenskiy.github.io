@@ -98,6 +98,11 @@
 .hud .hud-row b { width: 1.2em; text-align: right; font-family: var(--h-display); font-style: italic; color: var(--h-dim); font-variant-numeric: tabular-nums; }
 .hud .hud-row .hud-chip { display: block; width: 9px; height: 9px; border-radius: 50%; flex: none; box-shadow: 0 0 6px currentColor; }
 .hud .hud-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 12ch; }
+.hud .hud-row .hud-face { flex: none; margin-left: auto; stroke-width: 2.4; color: var(--h-lime); filter: drop-shadow(0 0 3px currentColor); }
+.hud .hud-row .hud-face.hurt { color: var(--h-amber); }
+.hud .hud-row .hud-face.burn { color: var(--h-red); }
+.hud .hud-row .hud-face.dead { color: var(--h-dim); }
+.hud .hud-row .hud-face.fin { color: var(--h-magenta); }
 .hud .hud-row.me { background: rgba(53, 230, 255, .14); border-left-color: var(--h-cyan); color: #fff; }
 .hud .hud-row.me b { color: var(--h-cyan); }
 .hud .hud-row.dead { opacity: .45; text-decoration: line-through; text-decoration-thickness: 1px; }

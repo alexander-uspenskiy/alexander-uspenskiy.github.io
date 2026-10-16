@@ -49,6 +49,16 @@ export function standings(snap) {
   return [...snap.cars].sort((a, b) => a.position - b.position);
 }
 
+/** Pure: co-racer status face: 'fin' (finished), 'dead' (wrecked), 'burn' (on fire), 'hurt' (armour under 35%), else 'ok'. */
+export function coracerFace(car) {
+  if (car.finished) return 'fin';
+  if (car.wrecked) return 'dead';
+  if (car.burning) return 'burn';
+  if (car.armorMax > 0 && car.armor / car.armorMax < 0.35) return 'hurt';
+  return 'ok';
+}
+const FACE_ICON = { ok: 'faceOk', hurt: 'faceHurt', burn: 'faceBurn', dead: 'faceDead', fin: 'faceFin' };
+
 // ui-local neon fallback for the 16 car colour slots (used when render/paletteRef has no MODERN_HEX yet)
 export const CHIP_FALLBACK = [
   '#1b2236', '#3b5bff', '#b0306e', '#1fbf7a', '#d2703c', '#8793a8', '#c9d4e6', '#f4f8ff',
@@ -343,11 +353,15 @@ export function createHud({ root, getWeapon = (id) => ({ name: id }) } = {}) {
 
       // --- standings ---
       const rows = standings(snap);
-      const bkey = rows.map((c) => c.id + (c.finished ? 'f' : c.wrecked ? 'w' : '')).join(',');
+      const bkey = rows.map((c) => c.id + (c.finished ? 'f' : c.wrecked ? 'w' : '') + (c.isPlayer ? '' : coracerFace(c))).join(',');
       if (board._k !== bkey) {
         board._k = bkey;
-        setChildren(board, rows.map((c, i) => h('div.hud-row' + (c.isPlayer ? '.me' : '') + (c.wrecked ? '.dead' : '') + (c.finished ? '.fin' : ''),
-          h('b', String(c.position ?? i + 1)), h('i.hud-chip', { style: { background: c.livery ? '#' + (c.livery.paintHex >>> 0).toString(16).padStart(6, '0') : carChip(c.color) } }), h('span', c.name))));
+        setChildren(board, rows.map((c, i) => {
+          const face = coracerFace(c);
+          return h('div.hud-row' + (c.isPlayer ? '.me' : '') + (c.wrecked ? '.dead' : '') + (c.finished ? '.fin' : ''),
+            h('b', String(c.position ?? i + 1)), h('i.hud-chip', { style: { background: c.livery ? '#' + (c.livery.paintHex >>> 0).toString(16).padStart(6, '0') : carChip(c.color) } }), h('span', c.name),
+            ...(c.isPlayer ? [] : [icon(FACE_ICON[face], { size: 13, cls: 'hud-face ' + face })]));
+        }));
       }
 
       // --- events -> feed / toasts ---

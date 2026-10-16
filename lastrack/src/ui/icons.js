@@ -131,6 +131,34 @@ export const UI_ICONS = {
     { d: ring(5.8, 12, 0.7), ...SOLID },
     { d: ring(18.2, 12, 0.7), ...SOLID },
   ] },
+  // Co-racer status faces for the standings board: ok, hurt (low armour), burn (on fire), dead (wrecked), fin (finished).
+  faceOk: { viewBox: VB, paths: [
+    { d: ring(12, 12, 9.5) },
+    { d: ring(9, 10.4, 0.9), ...SOLID }, { d: ring(15, 10.4, 0.9), ...SOLID },
+    { d: 'M8 14q4 4 8 0' },
+  ] },
+  faceHurt: { viewBox: VB, paths: [
+    { d: ring(12, 12, 9.5) },
+    { d: 'M6 8.2l3.6 1.1M18 8.2l-3.6 1.1' },
+    { d: ring(9.2, 11.6, 0.9), ...SOLID }, { d: ring(14.8, 11.6, 0.9), ...SOLID },
+    { d: 'M8.5 16.6q3.5-2.8 7 0' },
+  ] },
+  faceBurn: { viewBox: VB, paths: [
+    { d: ring(12, 12, 9.5) },
+    { d: 'M7.4 10.6q1.4-1.4 2.8 0M13.8 10.6q1.4-1.4 2.8 0' },
+    { d: 'M8.2 15.4h7.6M10.6 15.4v1.8M13.4 15.4v1.8' },
+    { d: 'M17.2 5.6q1.3 1.8 0 3q-1.3-1.2 0-3z', ...SOLID },
+  ] },
+  faceDead: { viewBox: VB, paths: [
+    { d: ring(12, 12, 9.5) },
+    { d: 'M7.6 8.6l3 3M10.6 8.6l-3 3M13.4 8.6l3 3M16.4 8.6l-3 3' },
+    { d: 'M8.6 16.2q1.7-1 3.4 0t3.4 0' },
+  ] },
+  faceFin: { viewBox: VB, paths: [
+    { d: ring(12, 12, 9.5) },
+    { d: 'M7.4 10.8q1.6-1.8 3.2 0M13.4 10.8q1.6-1.8 3.2 0' },
+    { d: 'M7.6 13.4q4.4 5 8.8 0' },
+  ] },
   lap: { viewBox: VB, paths: [
     { d: 'M5.5 21.5V3' },
     { d: 'M5.5 4.5h13.2l-2.6 3.6 2.6 3.6H5.5' },
