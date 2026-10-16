@@ -25,7 +25,7 @@ export function h(tag, props, ...children) {
     for (const [k, v] of Object.entries(props)) {
       if (v === undefined || v === null || v === false) continue;
       if (k === 'class' || k === 'className') el.setAttribute('class', [...cls, v].join(' '));
-      else if (k === 'style' && typeof v === 'object') Object.assign(el.style, v);
+      else if (k === 'style' && typeof v === 'object') { for (const [p, val] of Object.entries(v)) { if (p.startsWith('--')) el.style.setProperty(p, val); else el.style[p] = val; } }
       else if (k === 'dataset') Object.assign(el.dataset, v);
       else if (k === 'text') el.textContent = v;
       else if (k.startsWith('on') && typeof v === 'function') el.addEventListener(k.slice(2).toLowerCase(), v);
