@@ -147,6 +147,9 @@ input[type=range]:focus-visible { outline: 2px solid var(--cyan); outline-offset
 body.no-hints .keys { display: none; }
 .title-foot { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
 .title-foot .ver { font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); letter-spacing: .12em; }
+.credits { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: center; margin-top: 8px; font-family: var(--font-mono); font-size: 11px; letter-spacing: .06em; color: var(--text-dim); pointer-events: auto; }
+.credits a { color: var(--accent, #35e6ff); text-decoration: none; border-bottom: 1px solid transparent; transition: border-color .15s, color .15s; }
+.credits a:hover, .credits a:focus-visible { color: #fff; border-bottom-color: currentColor; outline: none; }
 .screen-title .glass-note { position: absolute; right: var(--pad-x); top: var(--pad-y); display: flex; gap: 8px; }
 
 /* ---------- 3D stage hint ---------- */

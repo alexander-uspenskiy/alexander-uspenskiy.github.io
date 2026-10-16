@@ -38,7 +38,11 @@ export function createTitleScreen({ game, flow, openSettings }) {
       h('h1.logo', { 'aria-label': 'Last Track' }, h('span', 'LAST'), h('span.alt', 'TRACK')),
       h('p.tag', 'Race for money. Race for your life.'),
       menu),
-    h('div.title-foot', keys, h('span.ver', 'three.js')));
+    h('div.title-foot', keys, h('span.ver', 'three.js')),
+    h('footer.credits',
+      h('span', '© 2026 Alexander Uspenskiy · MIT'),
+      h('a', { href: 'mailto:alexander.uspensky@gmail.com' }, 'alexander.uspensky@gmail.com'),
+      h('a', { href: 'https://github.com/alexander-uspenskiy/LastTrack', target: '_blank', rel: 'noopener noreferrer' }, 'github.com/alexander-uspenskiy/LastTrack')));
   let detach = null;
   return {
     el,
