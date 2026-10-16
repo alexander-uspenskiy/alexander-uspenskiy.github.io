@@ -377,3 +377,4 @@ body.no-hints .keys { display: none; }
 .screen-title .ver-badge{position:absolute;top:18px;left:22px;display:flex;align-items:center;gap:8px;padding:5px 12px 5px 10px;border-radius:999px;
   background:rgba(8,14,24,.55);border:1px solid rgba(120,220,255,.28);backdrop-filter:blur(8px);font:600 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.12em;color:#bfefff;z-index:5;pointer-events:none}
 .screen-title .ver-badge i{width:7px;height:7px;border-radius:50%;background:#37f3b0;box-shadow:0 0 8px #37f3b0}
+.shop-head { grid-column: 1 / -1; margin: 10px 2px 0; font: 700 12px/1 var(--font-head, inherit); letter-spacing: .24em; color: var(--cyan, #7df); opacity: .85; }

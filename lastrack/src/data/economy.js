@@ -4,6 +4,7 @@ import { getWeapon } from './weapons.js';
 import { UPGRADES, getUpgrade, upgradeCost, applyUpgrades } from './upgrades.js';
 import { TRACKS, GAME_TRACKS, getTrack } from './tracks/index.js';
 import { getPaint, getAccent, isNumberStr, PAINTS } from './liveries.js';
+import { getSpike, spikeCost, normalizeSpikes, noSpikes, SPIKE_TIERS } from './spikes.js';
 import { getDecal, normalizePlacement, MAX_DECALS } from './decals.js';
 
 export const STARTING_CASH = 5000;
@@ -42,6 +43,17 @@ export function purchaseUpgrade(save, id) {
   const cost = upgradeCost(id, next);
   if (save.cash < cost) return fail(save, 'insufficient-cash');
   return { ok: true, cost, save: { ...save, cash: save.cash - cost, upgrades: { ...save.upgrades, [id]: next } } };
+}
+
+/** Buy the next tier of a spike set (front / rear / wheels). */
+export function purchaseSpikes(save, id) {
+  const sp = getSpike(id);
+  if (!sp) return fail(save, 'unknown-spikes');
+  const cur = (save.spikes && save.spikes[id]) || 0;
+  if (cur >= SPIKE_TIERS) return fail(save, 'max-level');
+  const cost = spikeCost(id, cur + 1);
+  if (save.cash < cost) return fail(save, 'insufficient-cash');
+  return { ok: true, cost, save: { ...save, cash: save.cash - cost, spikes: { ...normalizeSpikes(save.spikes), [id]: cur + 1 } } };
 }
 
 export function purchaseWeapon(save, id) {
@@ -90,7 +102,7 @@ export function repairCar(save) {
 export function chooseCar(save, carId) {
   const car = getCar(carId);
   if (!car) return fail(save, 'unknown-car');
-  return { ok: true, save: { ...save, carId, upgrades: { armor: 0, engine: 0, tyres: 0 }, damage: 0, weapons: car.startWeapons.map((w) => ({ ...w })) } };
+  return { ok: true, save: { ...save, carId, upgrades: { armor: 0, engine: 0, tyres: 0 }, spikes: noSpikes(), damage: 0, weapons: car.startWeapons.map((w) => ({ ...w })) } };
 }
 
 /**

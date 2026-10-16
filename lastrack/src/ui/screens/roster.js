@@ -1,10 +1,11 @@
+import { normalizeSpikes } from '../../data/spikes.js';
 import { h, button, screenHeader, attachMenuKeys } from '../dom.js';
 import { DRIVERS } from '../../data/drivers.js';
 import { DRIVERS_BY_DIFFICULTY } from '../../data/raceConfig.js';
 import { getCar } from '../../data/cars.js';
 import { getWeapon } from '../../data/weapons.js';
 import { drawPortrait } from '../../render/portraits.js';
-import { weaponIcon } from '../icons.js';
+import { weaponIcon, icon } from '../icons.js';
 import { rating } from '../menuLogic.js';
 import { uiHex } from '../colors.js';
 import { getPaint, getAccent } from '../../data/liveries.js';
@@ -18,6 +19,12 @@ export function liveryStrip(d) {
   const [a, b] = d.liveries || [];
   return h('div.liveries', a ? row(a, 'LIVERY') : null, b ? row(b, 'ALT') : null);
 }
+/** Pure-ish: the rival's spike kit as a chip ('SPIKES F2 R2 W1'), or nothing. */
+export function spikeLabel(d) {
+  const sp = normalizeSpikes(d.spikes), parts = [['F', sp.front], ['R', sp.rear], ['W', sp.wheels]].filter(([, t]) => t > 0).map(([k, t]) => k + t);
+  return parts.length ? 'SPIKES ' + parts.join(' ') : '';
+}
+function spikeChip(d) { const l = spikeLabel(d); return l ? [h('span.chip.spk', icon('spikeFront', { size: 14 }), l)] : []; }
 export function createRosterScreen({ game, flow }) {
   let detach = null;
   const grid = h('div.roster-grid');
@@ -30,7 +37,8 @@ export function createRosterScreen({ game, flow }) {
       h('div.driver-info', h('h3', d.name), h('p.nick', `"${d.nickname}"`), h('p.bio', d.bio),
         h('div.driver-tags',
           h('span.wchip', weaponIcon(d.favoriteWeapon, { size: 18 }), fav?.name ?? d.favoriteWeapon),
-          h('span.chip', getCar(d.carId)?.name ?? d.carId)),
+          h('span.chip', getCar(d.carId)?.name ?? d.carId),
+          ...spikeChip(d)),
         liveryStrip(d),
         h('p.small.muted.races', 'DRAWN INTO RANDOM LINE-UPS'),
         h('div.mini-bars', ...miniBar('SKILL', d.skill, 'linear-gradient(90deg,var(--cyan),var(--violet))'), ...miniBar('AGGRESSION', d.aggression, 'linear-gradient(90deg,var(--amber),var(--red))'))),

@@ -212,7 +212,7 @@ export function createRaceController(host, track, config = {}) {
           speed: cb.speed, steer: cb.steer, ax: cb.ax, ay: cb.ay, throttle: cb.throttle, braking: cb.braking, wheelspin: cb.wheelspin,
           slip: cb.slip, firing: cb.firing && !cb.wrecked, frac, dmg: cb.dmg, wrecked: cb.wrecked, aim, rough: cb.surface === 'dirt' ? 1 : cb.surface === 'kerb' ? 0.5 : 0,
           reversing: (cb.vx * Math.cos(cb.heading) + cb.vy * Math.sin(cb.heading)) < -0.5,
-          wet: e.wet, dirt: e.dirt, weapons: cb.weapons,
+          wet: e.wet, dirt: e.dirt, weapons: cb.weapons, spikes: cb.spikes,
         }, dt, { far: pbrMode && Math.hypot(p.x - host.camera.position.x, p.y - host.camera.position.z) > 42, shadow: !pbrMode || Math.hypot(p.x - host.camera.position.x, p.y - host.camera.position.z) < 30 });
         // wetness / dirt accumulate from the surface under the car
         const sf = cb.surface;

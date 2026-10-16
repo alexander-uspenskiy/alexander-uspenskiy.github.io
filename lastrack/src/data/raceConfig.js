@@ -36,6 +36,7 @@ export function tracksFor(driverId) {
  * RaceConfig per ARCHITECTURE §3. Extras: rivals[] also carry { carId, name, color, helmet }; player carries { color }.
  * Race mode defaults to fieldFor(track); practice defaults to none (pass rivalIds to override either).
  */
+import { normalizeSpikes } from './spikes.js';
 export function createRaceConfig({ mode = 'race', trackId, laps, save, rivalIds, seed } = {}) {
   const sv = save || defaultSave();
   const track = getTrack(trackId) || getTrack('scrapyard');
@@ -50,7 +51,7 @@ export function createRaceConfig({ mode = 'race', trackId, laps, save, rivalIds,
     return {
       driverId: d.id, carId: d.carId, name: d.name, color: d.color, helmet: d.helmet,
       stats: applyUpgrades(rc.base, d.upgrades), loadout: d.loadout.map((w) => ({ ...w })),
-      skill: d.skill, aggression: d.aggression, favoriteWeapon: d.favoriteWeapon,
+      skill: d.skill, aggression: d.aggression, favoriteWeapon: d.favoriteWeapon, spikes: normalizeSpikes(d.spikes),
     };
   });
   return {
@@ -61,7 +62,7 @@ export function createRaceConfig({ mode = 'race', trackId, laps, save, rivalIds,
     player: {
       carId: car.id, color: car.color, stats,
       armor: practice ? stats.armor : Math.max(1, Math.round(stats.armor * (1 - sv.damage))),
-      loadout,
+      loadout, spikes: normalizeSpikes(sv.spikes),
     },
     rivals,
   };

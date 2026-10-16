@@ -377,6 +377,9 @@ export function createEffects(parent, { skid = true, soft = false } = {}) {
         const car = snap.cars[ev.carId]; if (!car) continue;
         const nSp = Math.min(30, 6 + Math.round((ev.strength || 1) * 3));
         for (let i = 0; i < nSp; i++) parts.emit(car.x + (Math.random() - 0.5) * 2, 0.4 + Math.random() * 0.5, car.y + (Math.random() - 0.5) * 2, (Math.random() - 0.5) * 12, 1 + Math.random() * 4, (Math.random() - 0.5) * 12, 0.25 + Math.random() * 0.25, 0.5, 0, i % 3 ? K.yellow : K.white, -9);
+      } else if (ev.type === 'spikeHit') {   // hot plasma/steel sparks fanning out of the impact point
+        const n = Math.min(34, 12 + Math.round((ev.strength || 1) * 1.6));
+        for (let i = 0; i < n; i++) parts.emit(ev.x + (Math.random() - 0.5), 0.35 + Math.random() * 0.6, ev.y + (Math.random() - 0.5), (Math.random() - 0.5) * 16, 1.5 + Math.random() * 5, (Math.random() - 0.5) * 16, 0.3 + Math.random() * 0.35, 0.5, 0, i % 3 === 0 ? K.white : i % 3 === 1 ? K.sky : K.orange, -9);
       } else if (ev.type === 'pickup') {
         const car = snap.cars[ev.carId]; if (!car) continue;
         for (let i = 0; i < 10; i++) parts.emit(car.x, 1, car.y, (Math.random() - 0.5) * 3, 3 + Math.random() * 2, (Math.random() - 0.5) * 3, 0.6, 0.8, 0, ev.pickupType === 'repair' ? K.lime : ev.pickupType === 'cash' ? K.sky : K.yellow, -4);

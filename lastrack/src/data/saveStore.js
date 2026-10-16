@@ -7,6 +7,7 @@ import { getWeapon } from './weapons.js';
 import { MAX_LEVEL } from './upgrades.js';
 import { TRACKS, SLICE_TRACKS } from './tracks/index.js';
 import { getPaint, getAccent, isNumberStr, PAINTS } from './liveries.js';
+import { normalizeSpikes, noSpikes } from './spikes.js';
 import { getDecal, normalizePlacements } from './decals.js';
 const ALL_TRACKS = [...TRACKS, ...SLICE_TRACKS];
 
@@ -39,6 +40,8 @@ export function defaultSave() {
     number: '',
     decalsOwned: [],
     decals: [],
+    // spikes (v0.4): tier 0..2 per set; older saves migrate to none
+    spikes: noSpikes(),
   };
 }
 
@@ -83,6 +86,7 @@ export function normalizeSave(input) {
   if (getAccent(input.accent)) d.accent = input.accent;
   if (isNumberStr(input.number)) d.number = input.number;
   if (Array.isArray(input.decalsOwned)) d.decalsOwned = [...new Set(input.decalsOwned.filter((id) => typeof id === 'string' && getDecal(id)))];
+  d.spikes = normalizeSpikes(input.spikes);
   d.decals = normalizePlacements(input.decals, d.decalsOwned, PAINTS.map((p) => p.id));
   return d;
 }

@@ -133,6 +133,7 @@ export function createGame({ root, canvas, storage, onError = () => {}, quality 
       let r;
       if (kind === 'upgrade') r = economy.purchaseUpgrade(saveData, id);
       else if (kind === 'weapon') r = economy.purchaseWeapon(saveData, id);
+      else if (kind === 'spikes') r = economy.purchaseSpikes(saveData, id);
       else if (kind === 'ammo') r = economy.buyAmmo(saveData, id, getWeapon(id)?.ammoPack ?? 10);
       else if (kind === 'repair') r = economy.repairCar(saveData);
       else return { ok: false, error: 'Unknown purchase.' };

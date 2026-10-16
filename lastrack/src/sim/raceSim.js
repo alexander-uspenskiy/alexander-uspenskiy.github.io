@@ -15,6 +15,7 @@ import { resolveWall, softEdge, wallDamage, resolveCarCar, pointCarDistance } fr
 import { newlyLost, remainingParts, PART_ORIGIN } from './parts.js';
 import { initRecovery, recoveryTimers, beginRecovery, stepRecovery } from './recovery.js';
 import { createDirector } from './raceDirector.js';
+import { contactZone, spikeDamage, spikeProtection } from '../data/spikes.js';
 import { createAI, driveAI } from './ai/aiDriver.js';
 import { surfaceAt, surfaceMods } from './surfaces.js';
 
@@ -24,6 +25,7 @@ const PICKUP_RESPAWN = 15;
 const REPAIR_FRACTION = 0.25;
 const CASH_PICKUP = 250;
 const RAM_MIN = 4, RAM_K = 0.4;
+const SPIKE_MIN_CLOSE = 2.5;
 const KILL_CREDIT_WINDOW = 4;
 const EMPTY_INPUT = { throttle: 0, brake: 0, steer: 0, fire: false, cycleWeapon: false, selectWeapon: null, handbrake: false, nitro: false };
 
@@ -45,8 +47,8 @@ export function createRaceSim(config, opts = {}) {
   const nextId = () => idCounter++;
 
   // ---- cars
-  const entries = [{ isPlayer: true, stats: config.player.stats, armor: config.player.armor, loadout: config.player.loadout, driverId: 'player', carId: config.player.carId, livery: config.player.livery || null }];
-  for (const r of config.rivals || []) entries.push({ isPlayer: false, stats: r.stats, armor: r.stats.armor, loadout: r.loadout, driverId: r.driverId, skill: r.skill, aggression: r.aggression, favoriteWeapon: r.favoriteWeapon, color: r.color, hunt: !!r.hunt, livery: r.livery || null });
+  const entries = [{ isPlayer: true, stats: config.player.stats, armor: config.player.armor, loadout: config.player.loadout, spikes: config.player.spikes || null, driverId: 'player', carId: config.player.carId, livery: config.player.livery || null }];
+  for (const r of config.rivals || []) entries.push({ isPlayer: false, stats: r.stats, armor: r.stats.armor, loadout: r.loadout, driverId: r.driverId, skill: r.skill, aggression: r.aggression, favoriteWeapon: r.favoriteWeapon, spikes: r.spikes || null, color: r.color, hunt: !!r.hunt, livery: r.livery || null });
   const grid = track.startGrid(entries.length);
   const cars = entries.map((e, i) => {
     const car = createCarBody(grid[i], e.stats);
@@ -60,6 +62,7 @@ export function createRaceSim(config, opts = {}) {
     car.partsLost = [];
     initWeapons(car, e.loadout);
     car.livery = e.livery || null;
+    car.spikes = e.spikes || null;
     car.kills = 0; car.bumpCd = 0; car.cash = 0; car.rank = i + 1;
     car.proj = track.project(car.x, car.y);
     initRecovery(car); car.scrapeCd = 0; car.wallT = -9;
@@ -119,6 +122,16 @@ export function createRaceSim(config, opts = {}) {
       c.kickX += ((c.x - x) / d) * kick; c.kickY += ((c.y - y) / d) * kick;
       damage(c, dmg, owner.id, def.id, x, y);
     }
+  }
+  /** `owner`'s spikes on contact zone `zone` bite `victim`: extra damage (credited to the owner, weapon 'spikes') + a spark event. */
+  function spikeHit(owner, victim, zone, close, victimMass) {
+    if (!owner.spikes || victim.wrecked) return;
+    const share = (2 * victimMass) / (owner.stats.mass + victimMass);
+    const extra = spikeDamage(owner.spikes, zone, close, share);
+    if (extra <= 0) return;
+    const mx = (owner.x + victim.x) / 2, my = (owner.y + victim.y) / 2;
+    emit('spikeHit', { carId: victim.id, byId: owner.id, zone, strength: close, dmg: extra, x: mx, y: my });
+    damage(victim, extra, owner.id, 'spikes', mx, my);
   }
   const projectiles = createProjectileSystem({ cars, track, halfWidth, emit, damage, blast, nextId });
   const hazards = createHazardSystem({ cars, emit, damage, popTyres, blast, nextId });
@@ -217,11 +230,15 @@ export function createRaceSim(config, opts = {}) {
         if (B.wrecked && B.wreckTimer <= 0) continue;
         if (Math.abs(A.x - B.x) > 6 || Math.abs(A.y - B.y) > 6) continue;
         const close = resolveCarCar(A, B);
-        if (close > RAM_MIN && A.bumpCd <= 0 && B.bumpCd <= 0) {
-          const base = (close - RAM_MIN) * RAM_K;
+        if ((close > RAM_MIN || ((A.spikes || B.spikes) && close > SPIKE_MIN_CLOSE)) && A.bumpCd <= 0 && B.bumpCd <= 0) {
+          const base = Math.max(0, close - RAM_MIN) * RAM_K;
           const tm = A.stats.mass + B.stats.mass;
-          if (!A.wrecked) damage(A, base * (2 * B.stats.mass) / tm * B.ramMult * A.ramTaken, B.id, 'ram', B.x, B.y);
-          if (!B.wrecked) damage(B, base * (2 * A.stats.mass) / tm * A.ramMult * B.ramTaken, A.id, 'ram', A.x, A.y);
+          const zA = A.spikes || B.spikes ? contactZone(A, B.x, B.y) : 'front', zB = A.spikes || B.spikes ? contactZone(B, A.x, A.y) : 'front';
+          const pA = spikeProtection(A.spikes, zA), pB = spikeProtection(B.spikes, zB);   // owner takes less ram damage on a spiked side
+          if (!A.wrecked) damage(A, base * (2 * B.stats.mass) / tm * B.ramMult * A.ramTaken * pA, B.id, 'ram', B.x, B.y);
+          if (!B.wrecked) damage(B, base * (2 * A.stats.mass) / tm * A.ramMult * B.ramTaken * pB, A.id, 'ram', A.x, A.y);
+          spikeHit(A, B, zA, close, B.stats.mass);
+          spikeHit(B, A, zB, close, A.stats.mass);
           emit('bump', { carId: A.id, strength: close });
           emit('bump', { carId: B.id, strength: close });
           A.bumpCd = B.bumpCd = 0.25;
@@ -266,7 +283,7 @@ export function createRaceSim(config, opts = {}) {
         color: c.color, helmetColor: c.helmetColor, livery: c.livery,
         gear: c.gear, rpm: c.rpm, limiter: c.limiter, shifted: c.shifted, ax: c.ax, ay: c.ay, load: c.load, slip: c.slip,
         wheelspin: c.wheelspin, braking: c.braking, surface: c.surface, throttle: c.throttleIn ?? 0,
-        dmg: c.dmgMap ? c.dmgMap.slice() : null,
+        dmg: c.dmgMap ? c.dmgMap.slice() : null, spikes: c.spikes || null,
         nitro: c.nitro, nitroOn: c.nitroOn, drift: c.drift, boost: c.boost, parts: c.partsLost ? c.partsLost.slice() : [],
       })),
       projectiles: projectiles.list.map((p) => ({ id: p.id, type: p.def.id, x: p.x, y: p.y, heading: p.heading, ownerId: p.owner.id, targetId: p.target ? p.target.id : null })),

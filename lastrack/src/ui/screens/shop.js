@@ -1,7 +1,8 @@
+import { SPIKES, SPIKE_TIERS } from '../../data/spikes.js';
 import { h, button, screenHeader, fmtMoney, attachMenuKeys, clear } from '../dom.js';
 import { WEAPONS } from '../../data/weapons.js';
 import { getCar } from '../../data/cars.js';
-import { weaponIcon } from '../icons.js';
+import { weaponIcon, icon } from '../icons.js';
 import { pct } from '../menuLogic.js';
 import { useStage } from '../stage.js';
 
@@ -26,7 +27,7 @@ export function createShopScreen({ game, flow }) {
   let detach = null, stageApi = null;
   const say = (t, bad = false) => { msg.textContent = t; msg.classList.toggle('bad', bad); };
 
-  function refreshStage() { const s = game.getSave(); game.stage?.setLoadout?.(s.weapons); }
+  function refreshStage() { const s = game.getSave(); game.stage?.setLoadout?.(s.weapons, s.spikes); }
 
   function render() {
     const save = game.getSave();
@@ -50,6 +51,23 @@ export function createShopScreen({ game, flow }) {
         h('div.shop-icon', weaponIcon(w.id, { size: 32 })),
         h('div.shop-name', h('b', w.name), h('small', weaponSpec(w))),
         h('div.shop-foot', ammo, act)));
+    }
+    // ---- spikes: three bolt-on sets, two tiers each (pure cosmetic + ram effect, see data/spikes.js)
+    list.append(h('h3.shop-head', 'RAM GEAR · SPIKES'));
+    for (const sp of SPIKES) {
+      const tier = (save.spikes && save.spikes[sp.id]) || 0;
+      const next = tier < SPIKE_TIERS ? sp.tiers[tier] : null;
+      const act = next
+        ? button(`${tier ? 'UPGRADE' : 'BUY'} ${fmtMoney(next.price)}`, () => { const r = game.buy('spikes', sp.id); say(r.ok ? `${next.name} fitted.` : r.error || 'Cannot buy.', !r.ok); render(); if (r.ok) refreshStage(); }, 'btn-primary btn-weapon btn-small')
+        : button('MAXED', () => {}, 'btn-ammo btn-small');
+      act.dataset.spikes = sp.id; act.disabled = !next || save.cash < next.price;
+      const cur = tier ? sp.tiers[tier - 1] : null;
+      const pips = h('div.ammo-meter', h('span', cur ? `${cur.name.toUpperCase()} · +${Math.round(cur.dealt * 100)}% dealt · -${Math.round(cur.taken * 100)}% taken` : `${sp.tiers[0].name} · +${Math.round(sp.tiers[0].dealt * 100)}% dealt · -${Math.round(sp.tiers[0].taken * 100)}% taken`),
+        h('div.bar-track', h('div.bar-fill', { style: { width: pct(tier, SPIKE_TIERS) + '%' } })));
+      list.append(h('div.shop-row' + (tier ? '.owned' : ''),
+        h('div.shop-icon', icon(sp.id === 'front' ? 'spikeFront' : sp.id === 'rear' ? 'spikeRear' : 'spikeWheel', { size: 32 })),
+        h('div.shop-name', h('b', `${sp.name}${tier ? ' · TIER ' + tier : ''}`), h('small', sp.blurb)),
+        h('div.shop-foot', pips, act)));
     }
   }
   const el = h('section.screen.screen-shop.screen-3d',

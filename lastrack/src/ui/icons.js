@@ -116,6 +116,10 @@ export const UI_ICONS = {
     { d: 'M12 2.8v18.4', opacity: 0.45 },
     { d: 'M12 2.8l7.4 2.7v5.9c0 4.5-3.1 8-7.4 9.8z', ...SOFT },
   ] },
+  // Spike glyphs: a row of spikes on a bar (front), angled spikes behind a bar (rear), a spiked hub (wheels).
+  spikeFront: { viewBox: VB, paths: [{ d: 'M3 17.5h18v2.6H3z' }, { d: 'M4 17.5L6.2 8l2.2 9.5M9.8 17.5L12 5l2.2 12.5M15.6 17.5L17.8 8l2.2 9.5' }] },
+  spikeRear: { viewBox: VB, paths: [{ d: 'M3 4h18v2.6H3z' }, { d: 'M5 6.6L3 16M12 6.6v11.4M19 6.6L21 16' }, { d: 'M6 20h12', opacity: 0.4 }] },
+  spikeWheel: { viewBox: VB, paths: [{ d: ring(12, 12, 5.2) }, { d: ring(12, 12, 1.6), ...SOLID }, { d: spokes(12, 12, 6.4, 10.6, 8, 0) }] },
   bolt: { viewBox: VB, paths: [{ d: 'M13.6 2.5L5.4 13.2h5.6l-1 8.3 8.2-10.8h-5.6z' }, { d: 'M13.6 2.5L5.4 13.2h5.6l-1 8.3 8.2-10.8h-5.6z', ...SOFT }] },
   wrench: { viewBox: VB, paths: [
     { d: 'M14.6 6.2a4.2 4.2 0 0 0-5.2 5.4L3.6 17.4a1.9 1.9 0 0 0 2.7 2.7l5.8-5.8a4.2 4.2 0 0 0 5.4-5.2l-2.7 2.7-2.3-.6-.6-2.3z' },

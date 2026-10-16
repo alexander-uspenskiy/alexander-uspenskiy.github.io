@@ -12,7 +12,7 @@ export function useStage(game, screenEl, { side = 1, mode = 'showcase' } = {}) {
         st.setMode(mode, { side });
         if (spec) {
           const sv = game.getSave && game.getSave();
-          const withW = spec.weapons || !sv || sv.carId !== spec.carId ? spec : { ...spec, weapons: sv.weapons };   // the garage car wears its owned hardware
+          const withW = spec.weapons || !sv || sv.carId !== spec.carId ? spec : { ...spec, weapons: sv.weapons, spikes: sv.spikes };   // the garage car wears its owned hardware
           st.setCar(withW.livery || !game.liveryOf ? withW : { ...withW, livery: game.liveryOf(spec.carId) });
         }
         return;

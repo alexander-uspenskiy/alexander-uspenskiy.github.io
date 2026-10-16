@@ -41,7 +41,7 @@ export function feedLine(ev, names) {
   if (ev.type !== 'wreck') return null;
   const victim = names[ev.carId] ?? 'Car ' + ev.carId;
   if (ev.byId === undefined || ev.byId === null || ev.byId < 0 || ev.byId === ev.carId) return `${victim} wrecked`;
-  return `${names[ev.byId] ?? 'Car ' + ev.byId} ✕ ${victim}`;
+  return `${names[ev.byId] ?? 'Car ' + ev.byId} ✕ ${victim}${ev.weaponId === 'spikes' ? ' · SPIKES' : ''}`;
 }
 
 /** Pure: standings rows sorted by position. */
