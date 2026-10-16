@@ -1,11 +1,12 @@
 // Pure flow state machine (no DOM). ARCHITECTURE.md §7.
-export const STATES = ['title', 'carSelect', 'garage', 'shop', 'roster', 'trackSelect', 'raceSettings', 'loading', 'race', 'paused', 'results'];
+export const STATES = ['title', 'carSelect', 'garage', 'shop', 'paint', 'roster', 'trackSelect', 'raceSettings', 'loading', 'race', 'paused', 'results'];
 
 export const TRANSITIONS = {
   title: ['carSelect', 'garage'],
   carSelect: ['garage', 'title'],
-  garage: ['shop', 'roster', 'trackSelect', 'title'],
-  shop: ['garage', 'roster'],
+  garage: ['shop', 'paint', 'roster', 'trackSelect', 'title'],
+  shop: ['garage', 'roster', 'paint'],
+  paint: ['garage', 'shop'],
   roster: ['garage', 'shop'],
   trackSelect: ['raceSettings', 'garage'],
   raceSettings: ['loading', 'trackSelect', 'garage'],

@@ -1,32 +1,52 @@
-// Node-safe geometry helpers: flat-shaded, vertex-coloured (palette) mesh building. No DOM / WebGL.
+// Node-safe geometry helpers: vertex-coloured mesh building (modern full-colour ramp, tiny per-face variation + AO-ish darker bottoms). No DOM / WebGL.
 import * as THREE from 'three';
-import { PALETTE } from './paletteRef.js';
+import { MODERN_HEX } from './paletteRef.js';
 export { clamp, lerp, smoothstep, wrapAngle, angleDiff, mulberry32, TAU } from '../core/mathUtil.js';
 
 const _c = new THREE.Color();
 const _rgbCache = new Map();
-/** palette index (or '#hex') -> [r,g,b] in THREE working (linear) space, cached. */
+/** semantic palette index (or '#hex') -> [r,g,b] in THREE working (linear) space, via the MODERN ramp; cached. */
 export function colorRGB(c) {
   let v = _rgbCache.get(c);
   if (!v) {
-    _c.set(typeof c === 'number' ? PALETTE[((c % 16) + 16) % 16] : c);
+    _c.set(typeof c === 'number' ? MODERN_HEX[((c % 16) + 16) % 16] : c);
     v = [_c.r, _c.g, _c.b];
     _rgbCache.set(c, v);
   }
   return v;
 }
 
-/** Accumulates non-indexed triangles with per-vertex colour; build() -> BufferGeometry with flat normals. */
+/** Deterministic 0..1 hash of three floats (position-keyed so results never depend on call order). */
+function hash3(x, y, z) {
+  let h = (Math.round(x * 64) * 374761393 + Math.round(y * 64) * 668265263 + Math.round(z * 64) * 2147483647) | 0;
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+
+/**
+ * Accumulates non-indexed triangles with per-vertex colour; build() -> BufferGeometry (flat normals, or angle-smoothed with opts.smooth).
+ * opts: { jitter=0.05 (+-brightness per triangle, deterministic), ao=0.3 (how much darker the bottom of a solid is: 0 disables),
+ *         aoSpan=1.1 (metres over which the bottom darkening fades), smooth=0 (degrees; >0 averages normals of coincident vertices within that angle) }
+ */
 export class MeshBuilder {
-  constructor() {
+  constructor(opts = {}) {
     this.p = [];
     this.c = [];
+    this.jitter = opts.jitter ?? 0.05;
+    this.ao = opts.ao ?? 0.3;
+    this.aoSpan = opts.aoSpan ?? 1.1;
+    this.smooth = opts.smooth ?? 0;
   }
   get triCount() { return this.p.length / 9; }
   tri(a, b, c, col) {
     const rgb = colorRGB(col);
+    const j = this.jitter ? 1 + (hash3((a[0] + b[0] + c[0]) / 3, (a[1] + b[1] + c[1]) / 3, (a[2] + b[2] + c[2]) / 3) - 0.5) * 2 * this.jitter : 1;
     this.p.push(a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2]);
-    for (let i = 0; i < 3; i++) this.c.push(rgb[0], rgb[1], rgb[2]);
+    for (const v of [a, b, c]) {
+      let f = j;
+      if (this.ao) { const t = Math.min(1, Math.max(0, v[1] / this.aoSpan)); f *= 1 - this.ao + this.ao * t * t * (3 - 2 * t); }
+      this.c.push(rgb[0] * f, rgb[1] * f, rgb[2] * f);
+    }
     return this;
   }
   /** Triangle wound so its normal faces away from `center` (for convex solids). */
@@ -104,9 +124,38 @@ export class MeshBuilder {
     g.setAttribute('position', new THREE.Float32BufferAttribute(this.p, 3));
     g.setAttribute('color', new THREE.Float32BufferAttribute(this.c, 3));
     g.computeVertexNormals(); // non-indexed => flat normals
+    if (this.smooth > 0) smoothNormals(g, this.smooth);
     g.computeBoundingSphere();
     return g;
   }
+}
+
+/** Replace flat normals by the average of coincident vertices' face normals whose faces are within `deg` of each other (bevel-like shading, sharp edges kept). */
+export function smoothNormals(g, deg = 45) {
+  const pos = g.attributes.position.array, nrm = g.attributes.normal.array, n = pos.length / 3;
+  const cosT = Math.cos((deg * Math.PI) / 180);
+  const buckets = new Map();
+  for (let i = 0; i < n; i++) {
+    const k = ((Math.round(pos[i * 3] * 200) * 73856093) ^ (Math.round(pos[i * 3 + 1] * 200) * 19349663) ^ (Math.round(pos[i * 3 + 2] * 200) * 83492791)) | 0;
+    const l = buckets.get(k);
+    if (l) l.push(i); else buckets.set(k, [i]);
+  }
+  const out = new Float32Array(nrm.length);
+  for (const l of buckets.values()) {
+    for (const i of l) {
+      let x = 0, y = 0, z = 0;
+      const ax = nrm[i * 3], ay = nrm[i * 3 + 1], az = nrm[i * 3 + 2];
+      for (const j of l) {
+        if (Math.abs(pos[j * 3] - pos[i * 3]) > 0.006 || Math.abs(pos[j * 3 + 1] - pos[i * 3 + 1]) > 0.006 || Math.abs(pos[j * 3 + 2] - pos[i * 3 + 2]) > 0.006) continue;
+        const bx = nrm[j * 3], by = nrm[j * 3 + 1], bz = nrm[j * 3 + 2];
+        if (ax * bx + ay * by + az * bz >= cosT) { x += bx; y += by; z += bz; }
+      }
+      const len = Math.hypot(x, y, z) || 1;
+      out[i * 3] = x / len; out[i * 3 + 1] = y / len; out[i * 3 + 2] = z / len;
+    }
+  }
+  g.setAttribute('normal', new THREE.BufferAttribute(out, 3));
+  return g;
 }
 
 /** Dispose geometries/materials under root (skip anything flagged userData.shared). */

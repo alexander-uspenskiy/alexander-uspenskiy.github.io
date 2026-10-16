@@ -5,7 +5,10 @@ import { STARTING_CASH } from './economy.js';
 import { CARS, getCar } from './cars.js';
 import { getWeapon } from './weapons.js';
 import { MAX_LEVEL } from './upgrades.js';
-import { TRACKS } from './tracks/index.js';
+import { TRACKS, SLICE_TRACKS } from './tracks/index.js';
+import { getPaint, getAccent, isNumberStr, PAINTS } from './liveries.js';
+import { getDecal, normalizePlacements } from './decals.js';
+const ALL_TRACKS = [...TRACKS, ...SLICE_TRACKS];
 
 export const SAVE_KEY = 'lasttrack.save.v1';
 export const SAVE_VERSION = 1;
@@ -30,6 +33,12 @@ export function defaultSave() {
     kills: 0,
     bestTimes: {},
     unlockedTracks: [TRACKS[0].id],
+    // livery (v0.3): null paint/accent = the car's stock colours; decalsOwned = bought decal ids; decals = placed (max 6)
+    paint: null,
+    accent: null,
+    number: '',
+    decalsOwned: [],
+    decals: [],
   };
 }
 
@@ -60,15 +69,21 @@ export function normalizeSave(input) {
   d.races = clamp(Math.floor(num(input.races, 0)), 0, MAX_CASH);
   d.kills = clamp(Math.floor(num(input.kills, 0)), 0, MAX_CASH);
   if (isObj(input.bestTimes)) {
-    for (const t of TRACKS) {
+    for (const t of ALL_TRACKS) {
       const v = num(input.bestTimes[t.id], NaN);
       if (Number.isFinite(v) && v > 0) d.bestTimes[t.id] = v;
     }
   }
   if (Array.isArray(input.unlockedTracks)) {
-    const ids = TRACKS.map((t) => t.id).filter((id) => id === TRACKS[0].id || input.unlockedTracks.includes(id));
+    const ids = ALL_TRACKS.map((t) => t.id).filter((id) => id === TRACKS[0].id || input.unlockedTracks.includes(id));
     d.unlockedTracks = ids;
   }
+  // livery migration: older saves have none of these fields -> stock paint, no decals
+  if (getPaint(input.paint)) d.paint = input.paint;
+  if (getAccent(input.accent)) d.accent = input.accent;
+  if (isNumberStr(input.number)) d.number = input.number;
+  if (Array.isArray(input.decalsOwned)) d.decalsOwned = [...new Set(input.decalsOwned.filter((id) => typeof id === 'string' && getDecal(id)))];
+  d.decals = normalizePlacements(input.decals, d.decalsOwned, PAINTS.map((p) => p.id));
   return d;
 }
 

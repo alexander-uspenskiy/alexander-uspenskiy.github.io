@@ -156,7 +156,7 @@ export function buildBodyGeometries() {
     }
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
-    g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setAttribute('aDirt', new THREE.Float32BufferAttribute(dirt, 1)); g.setIndex(idx);
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setAttribute('aDecalUv', new THREE.Float32BufferAttribute(uv.slice(), 2)); g.setAttribute('aDirt', new THREE.Float32BufferAttribute(dirt, 1)); g.setIndex(idx);
     return g;
   };
   const body = make((i, j) => !isHoodCell(xs, i, j), true), hood = make((i, j) => isHoodCell(xs, i, j));
@@ -231,4 +231,33 @@ export function orientTriangles(g) {
     if (d < 0) { ix[k + 1] = c; ix[k + 2] = b; flipped++; }
   }
   return flipped;
+}
+
+/**
+ * Decal frames for the body-shell zones: where each zone sits in the body UV square and how design space
+ * (metres; s = decal right, t = decal up) maps into UV: { u, v, M:[[du/ds, du/dt],[dv/ds, dv/dt]] }. Pure geometry (Node-safe).
+ */
+export function zoneFrames() {
+  const { P, xs } = buildBodyGrid();
+  const at = (i, j) => { const k = (i * RING + ((j % RING) + RING) % RING) * 3; return [P[k], P[k + 1], P[k + 2]]; };
+  const nearestStation = (x) => xs.reduce((b, v, i) => (Math.abs(v - x) < Math.abs(xs[b] - x) ? i : b), 0);
+  const flankJ = (i, wantY) => { let best = 1, bd = 9; for (let j = 1; j < NJ; j++) { const p = at(i, j); if (p[2] > 0.5 && Math.abs(p[1] - wantY) < bd) { bd = Math.abs(p[1] - wantY); best = j; } } return best; };
+  const frame = (i, j, S, T) => {
+    const a = at(i, j + 1), b = at(i, j - 1), c = at(i + 1, j), d = at(i - 1, j);
+    const du = 2 / RING, dv = (xs[i + 1] - xs[i - 1]) / (xs[xs.length - 1] - xs[0]);
+    const Ju = [0, 1, 2].map((k) => (a[k] - b[k]) / du), Jv = [0, 1, 2].map((k) => (c[k] - d[k]) / dv);
+    const dot = (p, q) => p[0] * q[0] + p[1] * q[1] + p[2] * q[2];
+    const A = dot(Ju, Ju), B = dot(Ju, Jv), C = dot(Jv, Jv), det = A * C - B * B;
+    const solve = (V) => { const r1 = dot(Ju, V), r2 = dot(Jv, V); return [(C * r1 - B * r2) / det, (A * r2 - B * r1) / det]; };
+    const ms = solve(S), mt = solve(T);
+    return { u: j / RING, v: (xs[i] - xs[0]) / (xs[xs.length - 1] - xs[0]), M: [[ms[0], mt[0]], [ms[1], mt[1]]] };
+  };
+  const iH = nearestStation(1.45), iT = nearestStation(-1.95), iD = nearestStation(-0.05);
+  const jR = flankJ(iD, 0.86);
+  return {
+    hood: frame(iH, NJ - 1, [0, 0, 1], [1, 0, 0]),
+    trunk: frame(iT, NJ - 1, [0, 0, 1], [1, 0, 0]),
+    doorR: frame(iD, jR, [1, 0, 0], [0, 1, 0]),
+    doorL: frame(iD, RING - jR, [-1, 0, 0], [0, 1, 0]),
+  };
 }

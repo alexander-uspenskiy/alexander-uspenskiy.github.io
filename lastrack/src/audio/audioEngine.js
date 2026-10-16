@@ -135,6 +135,19 @@ export function createAudioEngine() {
     noise(0.12, { type: 'highpass', f0: 5000, f1: 3000, vol: 0.45 * v, attack: 0.001 });      // initial crack
     for (let i = 0; i < 4; i++) noise(0.08, { type: 'bandpass', f0: 1800 - i * 300, f1: 500, q: 2.2, vol: 0.22 * v, when: 0.25 + i * 0.17 }); // debris rain
   };
+  // tiered blast: tier 3 = a wrecked car (sub boom, secondary bangs, tearing metal, falling scrap, fire roar)
+  const bigExplosion = (v, tier) => {
+    explosion(v);
+    if (tier >= 2) { tone(34, 1.3, { type: 'sine', vol: 0.8 * v, slide: -8 }); noise(0.9, { type: 'lowpass', f0: 380, f1: 50, vol: 0.7 * v, q: 0.5 }); }
+    if (tier >= 3) {
+      noise(0.5, { f0: 1200, f1: 80, vol: 0.55 * v, when: 0.11 }); tone(70, 0.5, { type: 'sine', vol: 0.45 * v, slide: -40, when: 0.11 });
+      noise(0.6, { f0: 900, f1: 60, vol: 0.5 * v, when: 0.3 }); tone(55, 0.7, { type: 'sine', vol: 0.4 * v, slide: -25, when: 0.3 });
+      noise(1.4, { type: 'bandpass', f0: 700, f1: 260, q: 0.6, vol: 0.28 * v, attack: 0.25, when: 0.4 });                    // fire roar
+      for (let i = 0; i < 7; i++) { const f = 700 + ((i * 937) % 2400); tone(f, 0.05, { type: 'triangle', vol: 0.1 * v, slide: -f * 0.5, when: 0.18 + i * 0.09 }); noise(0.05, { type: 'bandpass', f0: f, f1: f * 0.6, q: 6, vol: 0.18 * v, when: 0.2 + i * 0.09 }); }   // scrap clanging down
+    }
+  };
+  const partTear = (v) => { noise(0.22, { type: 'bandpass', f0: 2200, f1: 500, q: 3, vol: 0.4 * v }); tone(240, 0.12, { type: 'sawtooth', vol: 0.12 * v, slide: -150 }); tone(1500, 0.06, { type: 'triangle', vol: 0.1 * v, slide: -700, when: 0.1 }); };
+  const scrapeSnd = (v, k) => { noise(0.1, { type: 'bandpass', f0: 2400 + 1200 * k, f1: 1800, q: 1.4, vol: 0.2 * v }); noise(0.07, { type: 'highpass', f0: 5200, f1: 4200, vol: 0.1 * v }); };
   const mg = (v) => {
     noise(0.05, { type: 'bandpass', f0: 2600, f1: 1400, q: 1.2, vol: 0.35 * v });             // crack
     noise(0.03, { type: 'highpass', f0: 6000, f1: 4000, vol: 0.12 * v });                      // brass spit
@@ -161,6 +174,9 @@ export function createAudioEngine() {
     }
   }
 
+  const coolAt = {};
+  const snapCool = (key, gap) => { const t = ctx ? ctx.currentTime : 0; if ((coolAt[key] || 0) > t) return false; coolAt[key] = t + gap; return true; };
+  let nitroPrev = false;
   function handleEvents(snap, player) {
     const posOf = (id) => snap.cars[id];
     const vol = (x, y) => (player ? distanceGain(Math.hypot(x - player.x, y - player.y)) : 1);
@@ -176,8 +192,14 @@ export function createAudioEngine() {
           else whoosh(v, ev.weaponId === 'terminator');
           break;
         }
-        case 'explosion': explosion(clamp(vol(ev.x, ev.y) * (0.6 + (ev.radius || 6) / 12), 0, 1.2)); break;
-        case 'wreck': { const c = posOf(ev.carId); explosion(c ? vol(c.x, c.y) * 1.1 : 0.6); break; }
+        case 'explosion': {
+          const tier = ev.kind === 'wreck' ? 3 : ev.kind === 'terminator' || ev.kind === 'mine' || (ev.radius || 0) >= 8 ? 2 : (ev.radius || 6) >= 5 ? 1 : 0;
+          bigExplosion(clamp(vol(ev.x, ev.y) * (0.6 + (ev.radius || 6) / 12) * (tier >= 3 ? 1.15 : 1), 0, 1.3), tier); break;
+        }
+        case 'wreck': break;                                                    // the 'explosion' event of the wreck carries the sound
+        case 'partLost': { const v = vol(ev.x, ev.y); if (v > 0.05 && !ev.wreck) partTear(v); break; }
+        case 'scrape': { const c = posOf(ev.carId); const v = c ? (c.isPlayer ? 1 : vol(c.x, c.y) * 0.6) : 0.3; if (v > 0.05 && snapCool('scrape' + ev.carId, 0.09)) scrapeSnd(v, clamp((ev.speed || 10) / 50, 0, 1)); break; }
+        case 'recover': { const c = posOf(ev.carId); if (c && c.isPlayer) { tone(520, 0.12, { type: 'triangle', vol: 0.18 }); tone(780, 0.16, { type: 'triangle', vol: 0.18, when: 0.1 }); } break; }
         case 'flame': { const c = posOf(ev.carId); const v = c ? (c.isPlayer ? 1 : vol(c.x, c.y)) : 0.5; if (v > 0.05) noise(0.1, { type: 'bandpass', f0: 900, f1: 450, q: 0.7, vol: 0.2 * v }); break; }
         case 'hit': { if (ev.weaponId === 'flamethrower') break; const v = vol(ev.x ?? 0, ev.y ?? 0); if (v > 0.05) { noise(0.07, { type: 'bandpass', f0: 1800, f1: 800, q: 2, vol: 0.3 * v }); tone(140, 0.08, { type: 'square', vol: 0.15 * v }); } break; }
         case 'bump': { const c = posOf(ev.carId); const v = c ? (c.isPlayer ? 1 : vol(c.x, c.y)) : 0.5; noise(0.18, { f0: 400, f1: 80, vol: clamp((ev.strength || 0.5), 0.2, 1) * 0.7 * v }); tone(70, 0.15, { type: 'sine', vol: 0.5 * v, slide: -30 }); break; }
@@ -236,6 +258,7 @@ export function createAudioEngine() {
         lastCount = c;
       } else if (lastPhase === 'countdown' && snap.phase === 'racing') tone(880, 0.5, { vol: 0.35 });
       lastPhase = snap.phase;
+      if (player && !!player.nitroOn !== nitroPrev) { nitroPrev = !!player.nitroOn; if (nitroPrev) { noise(0.7, { type: 'bandpass', f0: 500, f1: 3200, q: 0.7, vol: 0.5, attack: 0.08 }); tone(180, 0.5, { type: 'sawtooth', vol: 0.18, slide: 380 }); } }
       if (snap.tick !== lastTick) { lastTick = snap.tick; handleEvents(snap, player); }
       score.update(snap, dt);
       if (score.failed) musicTick(); // procedural fallback only if the score files can't load

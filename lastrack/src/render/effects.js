@@ -3,6 +3,9 @@
 import * as THREE from 'three';
 import { MeshBuilder, colorRGB, wrapAngle, disposeObject } from './geomUtil.js';
 import { COLOR as K } from './paletteRef.js';
+import { carMuzzle } from './pbr/heroCarPBR.js';
+import { createDebris, chunkCount } from './debris.js';
+import { mulberry32 } from '../core/mathUtil.js';
 
 const VERT = `
 attribute float aSize; attribute float aAlpha; attribute vec3 aColor;
@@ -45,10 +48,10 @@ export class ParticlePool {
   /** colour = palette index. */
   emit(x, y, z, vx, vy, vz, life, size, grow, colour, rise = 0, drag = 0) {
     const i = this.cursor; this.cursor = (i + 1) % this.max;
-    const o = i * 3, c0 = colorRGB(colour), gm = this.soft && GLOW_COLOURS.has(colour) ? 2.6 : 1, c = [c0[0] * gm, c0[1] * gm, c0[2] * gm];
+    const o = i * 3, c0 = colorRGB(colour), gm = this.soft && GLOW_COLOURS.has(colour) ? 2.6 : 1;
     this.pos[o] = x; this.pos[o + 1] = y; this.pos[o + 2] = z;
     this.vel[o] = vx; this.vel[o + 1] = vy; this.vel[o + 2] = vz;
-    this.col[o] = c[0]; this.col[o + 1] = c[1]; this.col[o + 2] = c[2];
+    this.col[o] = c0[0] * gm; this.col[o + 1] = c0[1] * gm; this.col[o + 2] = c0[2] * gm;
     this.life[i] = life; this.maxLife[i] = life; this.size[i] = size; this.grow[i] = grow; this.alpha[i] = 1; this.rise[i] = rise; this.drag[i] = drag;
   }
   update(dt, uScale = 600) {
@@ -140,7 +143,10 @@ function pickupGeometry(type) {
 }
 
 const TRACER_MAX = 48;
-const EXPLO_MAX = 8;
+const EXPLO_MAX = 16;
+const RING_MAX = 8;
+const SCORCH_MAX = 28;
+const LATER_MAX = 48;
 
 /**
  * createEffects(scene) -> { group, handleEvents(snap), update(snapCur, dt, carPose), dispose() }
@@ -149,8 +155,9 @@ const EXPLO_MAX = 8;
 export function createEffects(parent, { skid = true, soft = false } = {}) {
   const root = new THREE.Group(); root.name = 'effects';
   parent.add(root);
-  const parts = new ParticlePool(900, soft);
+  const parts = new ParticlePool(2000, soft);
   const skids = new SkidMarks(skid ? 900 : 4);
+  const carIds = [];   // car id -> 'hammer' | 'wasp' | 'bulwark' (set by the race controller; picks the muzzle position)
   root.add(parts.points, skids.mesh);
 
   // tracers
@@ -164,13 +171,42 @@ export function createEffects(parent, { skid = true, soft = false } = {}) {
   const tracers = Array.from({ length: TRACER_MAX }, () => ({ life: 0, x: 0, z: 0, dx: 0, dz: 0, d: 0, len: 0 }));
   let trCursor = 0;
 
-  // explosions (fireball meshes)
-  const exGeo = new THREE.IcosahedronGeometry(1, 0);
-  const exMats = [basic(K.white), basic(K.yellow), basic(K.orange), basic(K.red)];
+  // explosions (fireball meshes), shockwave rings, scorch decals and a queue of delayed sub-effects (secondary blasts, smoke column)
+  const rnd = mulberry32(0xf17e);
+  const glow = (c) => { const m = basic(c); if (soft) m.color.multiplyScalar(2.4); return m; };
+  const exGeo = new THREE.IcosahedronGeometry(1, 1);
+  // fireball colour ramp (HDR-ish: values > 1 bloom in the PBR pass): white-hot -> yellow -> orange -> red -> smoke
+  const FIRE_RAMP = [[3.2, 2.7, 1.9], [2.8, 1.7, 0.4], [2.0, 0.75, 0.12], [1.0, 0.2, 0.05], [0.16, 0.13, 0.11]];
   const explosions = Array.from({ length: EXPLO_MAX }, () => {
-    const m = new THREE.Mesh(exGeo, exMats[0]); m.visible = false; root.add(m); return { m, t: 0, dur: 0.5, r: 6 };
+    const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
+    const m = new THREE.Mesh(exGeo, mat); m.visible = false; root.add(m); return { m, mat, t: 0, dur: 0.5, r: 6, rise: 0, y0: 1, spin: 0 };
   });
+  const exMats = explosions.map((e) => e.mat);
   let exCursor = 0;
+  const ringGeo = new THREE.RingGeometry(0.88, 1, 56); ringGeo.rotateX(-Math.PI / 2);
+  const rings = Array.from({ length: RING_MAX }, () => {
+    const mat = new THREE.MeshBasicMaterial({ color: 0xffe2b0, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide, fog: false });
+    if (soft) mat.color.multiplyScalar(2.2);
+    const m = new THREE.Mesh(ringGeo, mat); m.visible = false; m.renderOrder = 3; root.add(m); return { m, mat, t: 0, dur: 0.5, r: 8 };
+  });
+  let ringCursor = 0;
+  const scorchGeo = new THREE.CircleGeometry(1, 18); scorchGeo.rotateX(-Math.PI / 2);
+  const scorchMat = new THREE.MeshBasicMaterial({ color: 0x0b0908, transparent: true, opacity: 0.62, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 });
+  const scorchMesh = new THREE.InstancedMesh(scorchGeo, scorchMat, SCORCH_MAX);
+  scorchMesh.frustumCulled = false; scorchMesh.renderOrder = 1; scorchMesh.name = 'scorch';
+  { const z = new THREE.Matrix4().makeScale(0, 0, 0); for (let i = 0; i < SCORCH_MAX; i++) scorchMesh.setMatrixAt(i, z); }
+  root.add(scorchMesh);
+  let scorchCursor = 0;
+  const dummy = new THREE.Object3D();
+  function scorch(x, z, r, squash = 1) {
+    dummy.position.set(x, 0.05 + scorchCursor * 0.0006, z); dummy.rotation.set(0, rnd() * 6.283, 0); dummy.scale.set(r, 1, r * (0.7 + 0.3 * squash * rnd()));
+    dummy.updateMatrix(); scorchMesh.setMatrixAt(scorchCursor, dummy.matrix); scorchMesh.instanceMatrix.needsUpdate = true;
+    scorchCursor = (scorchCursor + 1) % SCORCH_MAX;
+  }
+  const later = Array.from({ length: LATER_MAX }, () => ({ t: -1, kind: 0, x: 0, z: 0, r: 0, a: 0 }));
+  function schedule(delay, kind, x, z, r, a = 0) {
+    for (const q of later) if (q.t < 0) { q.t = delay; q.kind = kind; q.x = x; q.z = z; q.r = r; q.a = a; return; }
+  }
 
   // shared dynamic-object geometry / materials
   const lit = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
@@ -192,20 +228,79 @@ export function createEffects(parent, { skid = true, soft = false } = {}) {
     const t = tracers[trCursor]; trCursor = (trCursor + 1) % TRACER_MAX;
     t.y = y; t.life = 0.14; t.x = x; t.z = z; t.dx = dx; t.dz = dz; t.d = 0; t.len = Math.min(range, 70);
   }
-  function explode(x, z, radius) {
+  const DEBRIS_PAINT = [0.55, 0.12, 0.08];
+  function fireball(x, y, z, r, dur, rise = 0) {
     const e = explosions[exCursor]; exCursor = (exCursor + 1) % EXPLO_MAX;
-    e.t = 0; e.dur = 0.45 + radius * 0.02; e.r = Math.max(2, radius); e.m.position.set(x, 1, z); e.m.visible = true; e.m.material = exMats[0];
-    const n = Math.min(50, 18 + radius * 3);
+    e.t = 0; e.dur = dur; e.r = r; e.rise = rise; e.y0 = y; e.spin = rnd() * 6.28; e.m.position.set(x, y, z); e.m.rotation.set(rnd() * 3, e.spin, rnd() * 3); e.m.visible = true;
+  }
+  function shockwave(x, z, r, dur) {
+    const e = rings[ringCursor]; ringCursor = (ringCursor + 1) % RING_MAX;
+    e.t = 0; e.dur = dur; e.r = r; e.m.position.set(x, 0.18, z); e.m.visible = true; e.m.scale.setScalar(0.5); e.mat.opacity = 0.9;
+  }
+  const FIRE_COLS = [K.white, K.yellow, K.orange, K.red, K.darkGrey];
+  function fireBurst(x, y, z, r, n) {
     for (let i = 0; i < n; i++) {
-      const a = Math.random() * 6.283, sp = (3 + Math.random() * 9) * (radius / 6 + 0.5), up = 2 + Math.random() * 8;
-      const c = [K.white, K.yellow, K.orange, K.red, K.darkGrey][(Math.random() * 5) | 0];
-      parts.emit(x, 1, z, Math.cos(a) * sp, up, Math.sin(a) * sp, 0.5 + Math.random() * 0.7, 0.9 + Math.random() * 0.9, 0, c, -6, 1.5);
-    }
-    for (let i = 0; i < 12; i++) {
-      const a = Math.random() * 6.283, sp = 1 + Math.random() * 3;
-      parts.emit(x, 1.5, z, Math.cos(a) * sp, 2 + Math.random() * 3, Math.sin(a) * sp, 1.5 + Math.random(), 1.6, 1.5, K.darkGrey, 1.5, 0.8);
+      const a = rnd() * 6.283, sp = (3 + rnd() * 9) * (r / 6 + 0.5), up = 2 + rnd() * 9;
+      parts.emit(x, y, z, Math.cos(a) * sp, up, Math.sin(a) * sp, 0.5 + rnd() * 0.8, (1.1 + rnd() * 1.6) * (0.7 + r / 14), 0.8, FIRE_COLS[(rnd() * 5) | 0], -6, 1.5);
     }
   }
+  function smokePuff(x, y, z, r, n, rise = 2.5) {
+    for (let i = 0; i < n; i++) parts.emit(x + (rnd() - 0.5) * r * 0.5, y, z + (rnd() - 0.5) * r * 0.5, (rnd() - 0.5) * 3, rise * (0.6 + rnd() * 0.8), (rnd() - 0.5) * 3, 1.6 + rnd() * 1.4, 1.8 + rnd() * 1.6, 2.2, rnd() < 0.5 ? K.darkGrey : K.black, 0.8, 0.9);
+  }
+  function groundDust(x, z, r) {
+    const n = Math.min(40, 14 + r * 3) | 0;
+    for (let i = 0; i < n; i++) { const a = (i / n) * 6.283 + rnd() * 0.3, sp = (7 + rnd() * 6) * (r / 8 + 0.6); parts.emit(x, 0.3, z, Math.cos(a) * sp, 0.4 + rnd() * 1.2, Math.sin(a) * sp, 0.7 + rnd() * 0.5, 1.0 + rnd() * 0.9, 1.8, rnd() < 0.5 ? K.sand : K.lightGrey, 0.4, 2.4); }
+  }
+  /** tier: 0 spark pop, 1 rocket-size, 2 mine / terminator, 3 wreck (full staged blast). */
+  function explode(x, z, radius, o = {}) {
+    const tier = o.tier ?? (radius >= 9 ? 2 : radius >= 5 ? 1 : 0), r = Math.max(2, radius);
+    const dur = 0.45 + r * 0.03;
+    fireball(x, 1, z, r * (tier >= 3 ? 1.15 : 1), dur, tier >= 2 ? r * 0.35 : 0);
+    shockwave(x, z, r * (tier >= 3 ? 2.6 : tier >= 2 ? 2.2 : 1.7), dur * 0.9);
+    fireBurst(x, 1, z, r, Math.min(90, 18 + r * 4 + tier * 8));
+    if (tier >= 2) for (let i = 0; i < 10 + tier * 6; i++) {   // heavy slow fire clouds that fill the fireball volume
+      const a = rnd() * 6.283, d = rnd() * r * 0.45;
+      parts.emit(x + Math.cos(a) * d, 0.8 + rnd() * r * 0.35, z + Math.sin(a) * d, Math.cos(a) * (1 + rnd() * 3), 1.5 + rnd() * 3.5, Math.sin(a) * (1 + rnd() * 3), 0.55 + rnd() * 0.6, (2.6 + rnd() * 2.4) * (0.7 + r / 14), 2.6, rnd() < 0.45 ? K.orange : rnd() < 0.5 ? K.yellow : K.red, 1.2, 1.2);
+    }
+    smokePuff(x, 1.6, z, r, 8 + tier * 3, 1.8);
+    if (tier >= 1) { groundDust(x, z, r); scorch(x, z, r * (tier >= 3 ? 1.05 : 0.7)); }
+    if (tier >= 1) debris.spawnBurst(x, z, chunkCount(tier * 0.5 + r / 12), 0.6 + tier * 0.3, (x * 977 + z * 131) >>> 0, DEBRIS_PAINT, 0.5, o.vx || 0, o.vz || 0);
+    if (tier >= 2) {
+      const n = tier >= 3 ? 3 : 1;
+      for (let k = 0; k < n; k++) { const a = rnd() * 6.283, d = r * (0.25 + rnd() * 0.5); schedule(0.09 + k * 0.13 + rnd() * 0.06, 0, x + Math.cos(a) * d, z + Math.sin(a) * d, r * (0.5 + rnd() * 0.25), tier); }
+      // rising smoke column + embers over the next ~1.4 s
+      for (let k = 0; k < 7; k++) schedule(0.15 + k * 0.17, 1, x, z, r, 1.5 + k * 1.5);
+    }
+    if (tier >= 3) schedule(0.45, 2, x, z, r * 0.7);        // late fireball: the fuel tank
+  }
+  function runLater(dt) {
+    for (const q of later) {
+      if (q.t < 0) continue;
+      q.t -= dt;
+      if (q.t > 0) continue;
+      const t = q.t; q.t = -1; void t;
+      if (q.kind === 0) {                                                  // secondary blast
+        fireball(q.x, 0.8 + rnd() * 0.8, q.z, q.r, 0.4 + q.r * 0.03, q.r * 0.25);
+        fireBurst(q.x, 1, q.z, q.r, 16); smokePuff(q.x, 1.4, q.z, q.r, 4, 2);
+        shockwave(q.x, q.z, q.r * 1.8, 0.35);
+        if (q.a >= 3) debris.spawnBurst(q.x, q.z, 6, 0.8, (q.x * 31 + q.z * 17) >>> 0, DEBRIS_PAINT, 0.7);
+      } else if (q.kind === 1) {                                           // smoke column slice
+        smokePuff(q.x, q.a, q.z, q.r * 0.6, 3, 3.2);
+        for (let i = 0; i < 3; i++) parts.emit(q.x + (rnd() - 0.5) * 2, q.a, q.z + (rnd() - 0.5) * 2, (rnd() - 0.5) * 2, 3 + rnd() * 3, (rnd() - 0.5) * 2, 0.7 + rnd() * 0.5, 1.2, -0.4, rnd() < 0.5 ? K.orange : K.yellow, 1, 0.5);
+      } else {                                                             // late fuel-tank fireball
+        fireball(q.x, 1.4, q.z, q.r * 1.1, 0.7, q.r * 0.6); shockwave(q.x, q.z, q.r * 2.2, 0.55); fireBurst(q.x, 1.4, q.z, q.r, 30);
+      }
+    }
+  }
+  const onBounce = (x, y, z, imp) => {
+    if (imp > 4) for (let i = 0; i < Math.min(8, imp | 0); i++) parts.emit(x, y + 0.1, z, (rnd() - 0.5) * 7, 1.5 + rnd() * 3.5, (rnd() - 0.5) * 7, 0.22 + rnd() * 0.25, 0.4, 0, rnd() < 0.5 ? K.yellow : K.white, -10);
+    if (imp > 7 && rnd() < 0.4) scorch(x, z, 0.5 + imp * 0.05, 0.4);
+  };
+  const onTrail = (x, y, z, heat) => {
+    parts.emit(x, y + 0.2, z, (rnd() - 0.5) * 0.8, 0.8 + rnd(), (rnd() - 0.5) * 0.8, 0.45 + rnd() * 0.3, 0.7 + heat * 0.4, -0.5, heat > 0.45 ? (rnd() < 0.5 ? K.orange : K.yellow) : K.red, 1.2, 0.6);
+    if (rnd() < 0.7) parts.emit(x, y + 0.3, z, (rnd() - 0.5), 1.4, (rnd() - 0.5), 1.0 + rnd() * 0.6, 1.0, 1.8, rnd() < 0.5 ? K.darkGrey : K.black, 0.7, 0.7);
+  };
+  const debris = createDebris(root, { soft, onBounce, onTrail });
   const poseOf = (car, getPose) => (getPose && getPose(car.id)) || car;
 
   function handleEvents(snap, getPose) {
@@ -220,10 +315,10 @@ export function createEffects(parent, { skid = true, soft = false } = {}) {
         if (ev.weaponId === 'machinegun') {
           const cc = Math.cos(p.heading + (soft ? 0 : sp)), ss = Math.sin(p.heading + (soft ? 0 : sp));
           if (soft) {                                  // PBR Hammer: twin barrels on the roof, straight along the heading
-            const side = (ev.tick ?? snap.tick) % 2 ? 0.14 : -0.14, ox = p.x + c * 1.45 - s * side, oz = p.y + s * 1.45 + c * side;
-            addTracer(ox, oz, c, s, 80, 1.77);
-            parts.emit(ox, 1.77, oz, c * 8, 0.2, s * 8, 0.07, 1.4, 0, K.yellow);
-            parts.emit(ox, 1.77, oz, c * 4, 0.2, s * 4, 0.05, 0.9, 0, K.white);
+            const mz = carMuzzle(carIds[car.id] || 'hammer'), side = mz.zs[((ev.tick ?? snap.tick) | 0) % mz.zs.length], ox = p.x + c * mz.x - s * side, oz = p.y + s * mz.x + c * side;
+            addTracer(ox, oz, c, s, 80, mz.y);
+            parts.emit(ox, mz.y, oz, c * 8, 0.2, s * 8, 0.07, 1.4, 0, K.yellow);
+            parts.emit(ox, mz.y, oz, c * 4, 0.2, s * 4, 0.05, 0.9, 0, K.white);
           } else {
           addTracer(p.x + c * 2.2, p.y + s * 2.2, cc, ss, 80);
           parts.emit(p.x + c * 2.4, 0.7, p.y + s * 2.4, c * 8, 0.5, s * 8, 0.07, 1.1, 0, K.yellow);
@@ -232,9 +327,27 @@ export function createEffects(parent, { skid = true, soft = false } = {}) {
         } else if (ev.weaponId === 'rocket' || ev.weaponId === 'terminator') {
           for (let i = 0; i < 6; i++) parts.emit(p.x + c * 2, 0.8, p.y + s * 2, c * 6 + (Math.random() - 0.5) * 3, 0.5, s * 6 + (Math.random() - 0.5) * 3, 0.35, 1.2, 1, i % 2 ? K.orange : K.white, 0, 2);
         }
-      } else if (ev.type === 'explosion') explode(ev.x, ev.y, ev.radius || 6);
-      else if (ev.type === 'wreck') {
-        const car = snap.cars[ev.carId]; if (car) explode(car.x, car.y, 8);
+      } else if (ev.type === 'explosion') {
+        const tier = ev.kind === 'wreck' ? 3 : ev.kind === 'terminator' || ev.kind === 'mine' || (ev.radius || 0) >= 8 ? 2 : (ev.radius || 6) >= 5 ? 1 : 0;
+        const car = ev.carId !== undefined ? snap.cars[ev.carId] : null;
+        explode(ev.x, ev.y, ev.kind === 'wreck' ? 10 : ev.radius || 6, { tier, vx: car ? car.vx : 0, vz: car ? car.vy : 0 });
+      } else if (ev.type === 'wreck') {
+        const car = snap.cars[ev.carId];
+        if (car) { scorch(car.x, car.y, 3.2, 0.5); smokePuff(car.x, 1.2, car.y, 3, 10, 3); }
+      } else if (ev.type === 'partLost') {
+        const car = snap.cars[ev.carId];
+        debris.spawnPart(ev, car ? colorRGB(car.color) : null);
+        for (let i = 0; i < 9; i++) parts.emit(ev.x, 0.7, ev.y, (rnd() - 0.5) * 9, 1 + rnd() * 5, (rnd() - 0.5) * 9, 0.25 + rnd() * 0.3, 0.55, 0, rnd() < 0.6 ? K.yellow : K.white, -9);
+        smokePuff(ev.x, 0.8, ev.y, 1.6, 3, 1.4);
+        if (ev.wreck !== true) shockwave(ev.x, ev.y, 3.2, 0.3);
+      } else if (ev.type === 'scrape') {
+        const car = snap.cars[ev.carId]; const sp = car ? poseOf(car, getPose) : null;
+        const h = sp ? sp.heading : 0, c = Math.cos(h), s = Math.sin(h), k = Math.min(1, (ev.speed || 10) / 40);
+        const nSp = 3 + (k * 5) | 0;
+        for (let i = 0; i < nSp; i++) parts.emit(ev.x + (rnd() - 0.5), 0.35 + rnd() * 0.5, ev.y + (rnd() - 0.5), -c * (8 + rnd() * 10) * (0.5 + k) + (rnd() - 0.5) * 4, 1 + rnd() * 4, -s * (8 + rnd() * 10) * (0.5 + k) + (rnd() - 0.5) * 4, 0.22 + rnd() * 0.3, 0.45, 0, rnd() < 0.5 ? K.yellow : K.orange, -12);
+        if (rnd() < 0.3) parts.emit(ev.x, 0.5, ev.y, 0, 1.2, 0, 0.7, 1.0, 1.4, K.lightGrey, 0.6, 1);
+      } else if (ev.type === 'recover') {
+        groundDust(ev.x, ev.y, 3);
       } else if (ev.type === 'flame') {
         const car = snap.cars[ev.carId]; if (!car) continue;
         const p = poseOf(car, getPose), range = ev.range || 14, cone = ev.cone || 0.38;
@@ -246,7 +359,9 @@ export function createEffects(parent, { skid = true, soft = false } = {}) {
         }
         if (Math.random() < 0.35) parts.emit(p.x + Math.cos(p.heading) * (range * 0.7), 1.2, p.y + Math.sin(p.heading) * (range * 0.7), 0, 1.5, 0, 0.8, 1.2, 1.5, K.darkGrey, 1, 0.5);
       } else if (ev.type === 'hit' && ev.x !== undefined && ev.weaponId !== 'flamethrower') {
-        for (let i = 0; i < 5; i++) parts.emit(ev.x, 0.8, ev.y, (Math.random() - 0.5) * 8, 1 + Math.random() * 4, (Math.random() - 0.5) * 8, 0.25, 0.5, 0, i % 2 ? K.yellow : K.white, -8);
+        const heavy = ev.weaponId === 'rocket' || ev.weaponId === 'terminator' || ev.weaponId === 'mine';
+        const n = heavy ? 14 : 5;
+        for (let i = 0; i < n; i++) parts.emit(ev.x, 0.8, ev.y, (rnd() - 0.5) * (heavy ? 14 : 8), 1 + rnd() * (heavy ? 7 : 4), (rnd() - 0.5) * (heavy ? 14 : 8), 0.25 + (heavy ? rnd() * 0.2 : 0), 0.5, 0, i % 2 ? K.yellow : K.white, -8);
       } else if (ev.type === 'bump') {
         const car = snap.cars[ev.carId]; if (!car) continue;
         const nSp = Math.min(30, 6 + Math.round((ev.strength || 1) * 3));
@@ -277,7 +392,7 @@ export function createEffects(parent, { skid = true, soft = false } = {}) {
 
     for (const v of hazMeshes.values()) v.seen = false;
     for (const h of snap.hazards || []) {
-      if (soft && h.type === 'wreck') continue;   // PBR cars keep their own charred wreck mesh
+      if (h.type === 'wreck') continue;   // the car mesh itself turns into the charred wreck (see raceController)
       let e = hazMeshes.get(h.id);
       if (!e) {
         let mesh;
@@ -318,10 +433,39 @@ export function createEffects(parent, { skid = true, soft = false } = {}) {
     for (const [id, v] of pickMeshes) if (!v.seen) { root.remove(v.mesh); pickMeshes.delete(id); }
   }
 
+  // burning wreck: flames licking out of the shell, a thick dark column and drifting embers; ages with the wreck timer
+  const wreckAge = new Map();
+  function wreckFx(car, p, dt) {
+    const age = (wreckAge.get(car.id) || 0) + dt; wreckAge.set(car.id, age);
+    const fade = age < 25 ? 1 : Math.max(0.25, 1 - (age - 25) / 25);
+    if (rnd() < dt * 46 * fade) parts.emit(p.x + (rnd() - 0.5) * 2.4, 0.7 + rnd() * 0.6, p.y + (rnd() - 0.5) * 1.6, (rnd() - 0.5) * 0.8, 2.6 + rnd() * 2.2, (rnd() - 0.5) * 0.8, 0.5 + rnd() * 0.4, 1.3 + rnd() * 0.8, -0.8, rnd() < 0.45 ? K.orange : rnd() < 0.5 ? K.yellow : K.red, 1.5, 0.4);
+    if (rnd() < dt * 22 * fade) parts.emit(p.x + (rnd() - 0.5) * 1.6, 1.2, p.y + (rnd() - 0.5) * 1.2, (rnd() - 0.5) * 1.6, 2.2 + rnd() * 1.8, (rnd() - 0.5) * 1.6, 2.2 + rnd() * 1.4, 1.6 + rnd(), 2.4, rnd() < 0.7 ? K.black : K.darkGrey, 1.1, 0.5);
+    if (rnd() < dt * 5 * fade) parts.emit(p.x + (rnd() - 0.5) * 2, 1.0, p.y + (rnd() - 0.5) * 2, (rnd() - 0.5) * 6, 5 + rnd() * 4, (rnd() - 0.5) * 6, 0.9 + rnd() * 0.6, 0.45, 0, K.yellow, -9, 0.3);
+  }
+  // damaged cars: smoke from the worst zone, sparks from missing panels, flames when nearly dead
+  function damageFx(car, p, c, s, dt) {
+    const d = car.dmg; let worst = 0, wz = 0;
+    for (let i = 0; i < 4; i++) if (d[i] > worst) { worst = d[i]; wz = i; }
+    if (worst < 0.35) return;
+    const az = wz === 0 ? 0 : wz === 2 ? Math.PI : wz === 1 ? Math.PI / 2 : -Math.PI / 2, a = p.heading + az, ox = p.x + Math.cos(a) * 1.5, oz = p.y + Math.sin(a) * 1.5;
+    if (rnd() < dt * 14 * worst) parts.emit(ox, 0.9, oz, -c * 2 + (rnd() - 0.5), 1.3, -s * 2 + (rnd() - 0.5), 0.9, 1.1, 1.5, worst > 0.7 ? K.black : K.darkGrey, 0.8, 0.8);
+    if (worst > 0.55 && rnd() < dt * 7 * worst) parts.emit(ox, 0.5, oz, (rnd() - 0.5) * 6, 1 + rnd() * 3, (rnd() - 0.5) * 6, 0.25 + rnd() * 0.2, 0.45, 0, rnd() < 0.5 ? K.yellow : K.orange, -10);
+  }
+  function nitroFx(car, p, c, s, dt) {
+    const rx = -s, rz = c;
+    for (const side of [-0.6, 0.6]) {
+      if (rnd() > 0.9) continue;
+      const ex = p.x - c * 2.7 + rx * side, ez = p.y - s * 2.7 + rz * side;
+      parts.emit(ex, 0.5, ez, -c * 16 + (rnd() - 0.5) * 2, 0.2 + rnd() * 0.5, -s * 16 + (rnd() - 0.5) * 2, 0.16 + rnd() * 0.1, 0.8, 0.8, rnd() < 0.5 ? K.sky : K.white, 0, 3);
+      if (rnd() < 0.4) parts.emit(ex, 0.5, ez, -c * 9, 0.3, -s * 9, 0.22, 1.0, 1.5, K.sky, 0, 3);
+    }
+  }
   function carFx(snap, dt, getPose) {
     for (const car of snap.cars) {
       const p = poseOf(car, getPose), c = Math.cos(p.heading), s = Math.sin(p.heading);
-      if (car.wrecked) { skidLast.set(car.id, null); if (Math.random() < dt * 8) parts.emit(p.x, 1.0, p.y, 0, 1.5, 0, 1, 1.4, 1.2, Math.random() < 0.6 ? K.darkGrey : K.orange, 1.5, 0.5); continue; }
+      if (car.wrecked) { skidLast.set(car.id, null); wreckFx(car, p, dt); continue; }
+      if (car.nitroOn) nitroFx(car, p, c, s, dt);
+      if (car.dmg) damageFx(car, p, c, s, dt);
       const hx = p.x + c * 1.3, hz = p.y + s * 1.3;
       if (car.burning && Math.random() < dt * 40) parts.emit(hx + (Math.random() - 0.5) * 0.6, 0.9, hz + (Math.random() - 0.5) * 0.6, 0, 2.2, 0, 0.45, 0.9, -0.5, Math.random() < 0.5 ? K.orange : Math.random() < 0.5 ? K.yellow : K.red, 1, 0.3);
       if ((car.smoke || car.burning) && Math.random() < dt * 25) parts.emit(hx, 1.0, hz, -c * 2 + (Math.random() - 0.5), 1.4, -s * 2 + (Math.random() - 0.5), 0.9, 1.2, 1.6, car.burning ? K.black : K.darkGrey, 0.8, 0.8);
@@ -399,24 +543,42 @@ export function createEffects(parent, { skid = true, soft = false } = {}) {
     }
     trGeo.setDrawRange(0, n * 2);
     trGeo.attributes.position.needsUpdate = true;
-    // explosions
+    // explosions: expanding, rising fireballs that cool white -> yellow -> orange -> red -> smoke grey
     for (const e of explosions) {
       if (!e.m.visible) continue;
       e.t += dt;
       const k = e.t / e.dur;
       if (k >= 1) { e.m.visible = false; continue; }
-      e.m.scale.setScalar(e.r * (0.25 + 0.75 * Math.min(1, k * 2.2)) * (k < 0.7 ? 1 : 1 - (k - 0.7) / 0.3 * 0.6));
-      e.m.material = exMats[Math.min(3, (k * 4) | 0)];
+      const grow = 1 - Math.pow(1 - Math.min(1, k * 1.8), 2);
+      const sc = e.r * 0.8 * (0.2 + 0.8 * grow) * (k < 0.7 ? 1 : 1 - (k - 0.7) / 0.3 * 0.5);
+      e.m.scale.set(sc, sc * (0.78 + 0.3 * k), sc);
+      e.m.position.y = e.y0 + e.rise * k;
+      e.m.rotation.y = e.spin + k * 2;
+      const f = Math.min(3.999, k * 4.2), i0 = f | 0, a = f - i0, c0 = FIRE_RAMP[i0], c1 = FIRE_RAMP[i0 + 1];
+      e.mat.color.setRGB(c0[0] + (c1[0] - c0[0]) * a, c0[1] + (c1[1] - c0[1]) * a, c0[2] + (c1[2] - c0[2]) * a);
+      e.mat.opacity = 0.92 * Math.pow(1 - k, 0.7);
     }
+    for (const e of rings) {
+      if (!e.m.visible) continue;
+      e.t += dt;
+      const k = e.t / e.dur;
+      if (k >= 1) { e.m.visible = false; continue; }
+      e.m.scale.setScalar(e.r * (0.1 + 0.9 * (1 - Math.pow(1 - k, 3))));
+      e.mat.opacity = 0.85 * Math.pow(1 - k, 1.6);
+    }
+    runLater(dt);
+    debris.update(dt);
     parts.update(dt, uScale);
   }
 
   function dispose() {
     parent.remove(root);
-    skids.dispose(); parts.dispose();
+    skids.dispose(); parts.dispose(); debris.dispose();
+    ringGeo.dispose(); rings.forEach((r) => r.mat.dispose()); scorchGeo.dispose(); scorchMat.dispose(); scorchMesh.dispose();
     for (const g of shared) g.dispose();
-    lit.dispose(); trMat.dispose(); [lampOn, lampOff, lampArmed, ...puddleMats].forEach((m) => m.dispose()); exMats.forEach((m) => m.dispose());
+    explosions.forEach((e) => e.mat.dispose());
+    lit.dispose(); trMat.dispose(); [lampOn, lampOff, lampArmed, ...puddleMats].forEach((m) => m.dispose()); 
     disposeObject(root);
   }
-  return { group: root, particles: parts, skids, handleEvents, update, dispose, wrapAngle };
+  return { group: root, particles: parts, skids, debris, handleEvents, update, dispose, wrapAngle, explode, carIds };
 }

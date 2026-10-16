@@ -1,5 +1,5 @@
 // Armor pool, wreck state and tyre status. Operates on car objects owned by raceSim.
-export const WRECK_LIFETIME = 5;     // s a wreck stays as an obstacle
+export const WRECK_LIFETIME = 45;    // s a burning wreck stays on the track as a solid obstacle
 export const TYRE_POP_TIME = 6;      // s
 export const OIL_GRIP = 0.4;       // grip multiplier while on / just off an oil slick
 export const SMOKE_FRAC = 0.3;

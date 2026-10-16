@@ -9,7 +9,9 @@ import { SIM_DT, createCarBody, stepBody } from './carPhysics.js';
 import { initDamage, applyDamage, damageZone, addZoneDamage, popTyres, updateDamage, damageMods, isSmoking, isBurning, repair } from './damage.js';
 import { initWeapons, tryFire, cycleWeapon, selectWeapon, tickCooldowns, addAmmo } from './weapons.js';
 import { createProjectileSystem, createHazardSystem } from './projectiles.js';
-import { resolveWall, resolveCarCar, pointCarDistance } from './collisions.js';
+import { resolveWall, softEdge, wallDamage, resolveCarCar, pointCarDistance } from './collisions.js';
+import { newlyLost, remainingParts, PART_ORIGIN } from './parts.js';
+import { initRecovery, recoveryTimers, beginRecovery, stepRecovery } from './recovery.js';
 import { createDirector } from './raceDirector.js';
 import { createAI, driveAI } from './ai/aiDriver.js';
 import { surfaceAt, surfaceMods } from './surfaces.js';
@@ -19,10 +21,9 @@ const PICKUP_RADIUS = 3.5;
 const PICKUP_RESPAWN = 15;
 const REPAIR_FRACTION = 0.25;
 const CASH_PICKUP = 250;
-const WALL_DMG_MIN = 4, WALL_DMG_K = 1.2;
 const RAM_MIN = 4, RAM_K = 0.4;
 const KILL_CREDIT_WINDOW = 4;
-const EMPTY_INPUT = { throttle: 0, brake: 0, steer: 0, fire: false, cycleWeapon: false, selectWeapon: null, handbrake: false };
+const EMPTY_INPUT = { throttle: 0, brake: 0, steer: 0, fire: false, cycleWeapon: false, selectWeapon: null, handbrake: false, nitro: false };
 
 export function createRaceSim(config, opts = {}) {
   const track = opts.track || buildTrack(getTrack(config.trackId));
@@ -30,6 +31,7 @@ export function createRaceSim(config, opts = {}) {
   const halfWidth = track.width / 2;
   const seed = (config.seed ?? 1) >>> 0;
   const rng = mulberry32(seed);
+  const fxRng = mulberry32((seed ^ 0x9e3779b9) >>> 0);   // separate stream: cosmetic seeds never perturb gameplay randomness
   const bus = createEventBus();
   let frameEvents = [];
   const emit = (type, payload) => {
@@ -41,8 +43,8 @@ export function createRaceSim(config, opts = {}) {
   const nextId = () => idCounter++;
 
   // ---- cars
-  const entries = [{ isPlayer: true, stats: config.player.stats, armor: config.player.armor, loadout: config.player.loadout, driverId: 'player', carId: config.player.carId }];
-  for (const r of config.rivals || []) entries.push({ isPlayer: false, stats: r.stats, armor: r.stats.armor, loadout: r.loadout, driverId: r.driverId, skill: r.skill, aggression: r.aggression, favoriteWeapon: r.favoriteWeapon, color: r.color, hunt: !!r.hunt });
+  const entries = [{ isPlayer: true, stats: config.player.stats, armor: config.player.armor, loadout: config.player.loadout, driverId: 'player', carId: config.player.carId, livery: config.player.livery || null }];
+  for (const r of config.rivals || []) entries.push({ isPlayer: false, stats: r.stats, armor: r.stats.armor, loadout: r.loadout, driverId: r.driverId, skill: r.skill, aggression: r.aggression, favoriteWeapon: r.favoriteWeapon, color: r.color, hunt: !!r.hunt, livery: r.livery || null });
   const grid = track.startGrid(entries.length);
   const cars = entries.map((e, i) => {
     const car = createCarBody(grid[i], e.stats);
@@ -53,9 +55,12 @@ export function createRaceSim(config, opts = {}) {
     car.color = e.isPlayer ? def?.color ?? 8 : e.color ?? driver?.color ?? 9;
     car.helmetColor = e.isPlayer ? 7 : driver?.helmet ?? 10;
     initDamage(car, e.stats.armor ?? 60, e.armor);
+    car.partsLost = [];
     initWeapons(car, e.loadout);
+    car.livery = e.livery || null;
     car.kills = 0; car.bumpCd = 0; car.cash = 0; car.rank = i + 1;
     car.proj = track.project(car.x, car.y);
+    initRecovery(car); car.scrapeCd = 0; car.wallT = -9;
     car.aiControlled = !e.isPlayer || !!opts.aiPlayer;
     if (car.aiControlled || e.isPlayer) {
       car.ai = createAI(track, car, e.isPlayer ? { skill: opts.aiSkill ?? 1, aggression: 0 } : { skill: e.skill ?? 0.8, aggression: e.aggression ?? 0.5, favoriteWeapon: e.favoriteWeapon, hunt: e.hunt });
@@ -68,6 +73,20 @@ export function createRaceSim(config, opts = {}) {
   director.rank(cars);
 
   // ---- damage routing
+  function shedParts(victim, ids, wreck, power) {
+    if (!ids.length) return;
+    const c = Math.cos(victim.heading), sn = Math.sin(victim.heading);
+    for (const id of ids) {
+      victim.partsLost.push(id);
+      const o = PART_ORIGIN[id];
+      emit('partLost', {
+        carId: victim.id, part: id, wreck: !!wreck, power,
+        x: victim.x + o.fx * c - o.fy * sn, y: victim.y + o.fx * sn + o.fy * c,
+        dx: o.dx * c - o.dy * sn, dy: o.dx * sn + o.dy * c,
+        vx: victim.vx, vy: victim.vy, heading: victim.heading, seed: (fxRng() * 4294967296) >>> 0,
+      });
+    }
+  }
   function damage(victim, amount, byId, weaponId, x, y) {
     if (victim.wrecked || amount <= 0) return;
     let credit = byId;
@@ -75,14 +94,17 @@ export function createRaceSim(config, opts = {}) {
     addZoneDamage(victim, damageZone(victim, x ?? victim.x, y ?? victim.y), amount);
     const killed = applyDamage(victim, amount, credit, raceTime);
     emit('hit', { carId: victim.id, byId: byId ?? null, weaponId, dmg: amount, x: x ?? victim.x, y: y ?? victim.y });
+    const power = clamp(amount / Math.max(1, victim.armorMax) * 4, 0.2, 1.5);
+    if (!killed) shedParts(victim, newlyLost(victim.dmgMap, victim.armor / victim.armorMax, victim.partsLost), false, power);
     if (killed) {
       if (credit !== null && credit !== undefined && credit !== victim.id && cars[credit]) cars[credit].kills++;
-      emit('wreck', { carId: victim.id, byId: credit !== victim.id ? credit ?? null : null });
-      emit('explosion', { x: victim.x, y: victim.y, radius: 5 });
+      emit('wreck', { carId: victim.id, byId: credit !== victim.id ? credit ?? null : null, x: victim.x, y: victim.y, vx: victim.vx, vy: victim.vy, heading: victim.heading, weaponId, seed: (fxRng() * 4294967296) >>> 0 });
+      emit('explosion', { x: victim.x, y: victim.y, radius: 5, kind: 'wreck', big: true, carId: victim.id, weaponId });
+      shedParts(victim, remainingParts(victim.partsLost), true, 1 + power * 0.5);
     }
   }
   function blast(x, y, def, owner, direct) {
-    emit('explosion', { x, y, radius: def.radius });
+    emit('explosion', { x, y, radius: def.radius, kind: def.id, big: def.radius >= 6, ownerId: owner ? owner.id : null });
     for (const c of cars) {
       if (c.wrecked) continue;
       const dist = c === direct ? 0 : Math.max(0, pointCarDistance(c, x, y));
@@ -147,19 +169,38 @@ export function createRaceSim(config, opts = {}) {
       car.surface = sfName;
       mods.gripMult *= sf.grip; mods.dragExtra = sf.drag; mods.rough = sf.rough;
       mods.locked = !racing;
+      mods.kick = car.aiControlled ? 0 : 1; mods.noNitro = car.aiControlled;   // AI drives clean; nitro is a human toy
       car.throttleIn = inp.throttle || 0;
       stepBody(car, inp, dt, mods);
       if (car.wrecked) { car.vx *= 0.97; car.vy *= 0.97; }
     }
 
-    // walls
+    // walls: soft run-off band first, then the solid wall (glancing blows deflect, damage only above a clear impact)
     for (const car of cars) {
       car.proj = track.project(car.x, car.y, car.proj.i);
+      if (car.recT > 0) continue;
+      softEdge(car, car.proj, halfWidth, dt);
+      car.scrapeCd = Math.max(0, car.scrapeCd - dt);
       const impact = resolveWall(car, car.proj, halfWidth);
       if (impact > 0) {
+        car.wallT = raceTime;
+        const side = Math.sign(car.proj.d || 1);
+        const wx = car.x - Math.sin(car.proj.heading) * side * 1.5, wy = car.y + Math.cos(car.proj.heading) * side * 1.5;
         if (impact > 2) emit('bump', { carId: car.id, strength: impact });
-        if (impact > WALL_DMG_MIN && !car.wrecked) damage(car, (impact - WALL_DMG_MIN) * WALL_DMG_K, null, 'wall', car.x - Math.sin(car.proj.heading) * Math.sign(car.proj.d || 1) * 3, car.y + Math.cos(car.proj.heading) * Math.sign(car.proj.d || 1) * 3);
+        if (car.scrapeCd <= 0 && car.speed > 6) { car.scrapeCd = 0.07; emit('scrape', { carId: car.id, x: wx, y: wy, speed: car.speed, impact, side }); }
+        const dmg = wallDamage(impact);
+        if (dmg > 0 && !car.wrecked) damage(car, dmg * (1100 / Math.max(900, car.stats.mass)) ** 0.5, null, 'wall', car.x - Math.sin(car.proj.heading) * side * 3, car.y + Math.cos(car.proj.heading) * side * 3);
         car.proj = track.project(car.x, car.y, car.proj.i);
+      }
+    }
+    // human cars: auto-recover when facing the wrong way or wedged against a wall
+    if (racing) for (const car of cars) {
+      if (car.aiControlled || car.wrecked || car.finished) continue;
+      if (stepRecovery(car, car.proj, halfWidth, dt)) { car.proj = track.project(car.x, car.y, car.proj.i); continue; }
+      const err = Math.atan2(Math.sin(car.heading - car.proj.heading), Math.cos(car.heading - car.proj.heading));
+      if (recoveryTimers(car, err, raceTime - car.wallT < 0.3, dt)) {
+        beginRecovery(car, car.proj);
+        emit('recover', { carId: car.id, x: car.x, y: car.y });
       }
     }
     // car-car
@@ -213,13 +254,14 @@ export function createRaceSim(config, opts = {}) {
       cars: cars.map((c) => ({
         id: c.id, driverId: c.driverId, isPlayer: c.isPlayer, name: c.name,
         x: c.x, y: c.y, heading: c.heading, vx: c.vx, vy: c.vy, speed: c.speed, steer: c.steer, yawRate: c.yawRate,
-        armor: c.armor, armorMax: c.armorMax, wrecked: c.wrecked, smoke: isSmoking(c), burning: isBurning(c), tyresPopped: c.tyreTimer > 0, oiled: c.oilTimer > 0,
+        armor: c.armor, armorMax: c.armorMax, wrecked: c.wrecked, wreckT: c.wrecked ? c.wreckTimer : 0, smoke: isSmoking(c), burning: isBurning(c), tyresPopped: c.tyreTimer > 0, oiled: c.oilTimer > 0,
         lap: director.lapOf(c), s: director.sOf(c), position: c.rank, finished: c.finished, finishTime: c.finishTime, kills: c.kills,
         weapons: c.weapons.map((w) => ({ id: w.id, ammo: w.ammo })), activeWeapon: c.activeWeapon, firing: c.firing,
-        color: c.color, helmetColor: c.helmetColor,
+        color: c.color, helmetColor: c.helmetColor, livery: c.livery,
         gear: c.gear, rpm: c.rpm, limiter: c.limiter, shifted: c.shifted, ax: c.ax, ay: c.ay, load: c.load, slip: c.slip,
         wheelspin: c.wheelspin, braking: c.braking, surface: c.surface, throttle: c.throttleIn ?? 0,
         dmg: c.dmgMap ? c.dmgMap.slice() : null,
+        nitro: c.nitro, nitroOn: c.nitroOn, drift: c.drift, boost: c.boost, parts: c.partsLost ? c.partsLost.slice() : [],
       })),
       projectiles: projectiles.list.map((p) => ({ id: p.id, type: p.def.id, x: p.x, y: p.y, heading: p.heading, ownerId: p.owner.id })),
       hazards: [

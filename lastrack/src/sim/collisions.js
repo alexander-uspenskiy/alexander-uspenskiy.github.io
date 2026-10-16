@@ -1,26 +1,74 @@
 // Wall and car-car collision response. Cars are plain objects (see carPhysics.createCarBody + raceSim fields).
 import { clamp, wrapAngle } from '../core/mathUtil.js';
-import { CAR_HALF_LENGTH, CAR_HALF_WIDTH } from './carPhysics.js';
+import { CAR_HALF_LENGTH, CAR_HALF_WIDTH, SIM_DT } from './carPhysics.js';
 
-export const WALL_RESTITUTION = 0.25;
+export const WALL_RESTITUTION = 0.12;
+/** Forgiving-wall tuning: soft run-off band, glancing-blow response and the damage threshold. */
+export const WALL = {
+  soft: 1.4,         // m: width of the soft run-off band in front of the solid wall (measured at the body corners)
+  softPush: 10,      // m/s² of inward push at full depth of the band
+  softBleed: 3.5,    // 1/s: outward normal velocity bled off at full depth
+  friction: 0.15,    // wall friction coefficient: tangential speed lost = friction * normal speed absorbed
+  align: 6,          // 1/s: the nose swings along the wall while in contact
+  dmgMin: 9,         // m/s of impact (normal) speed below which a wall does no damage
+  dmgK: 0.9,         // armor points per m/s above the threshold
+};
 const CIRCLE_OFFSETS = [1.3, -1.3];
 export const CIRCLE_R = 1.1;
 
-/**
- * Track edges are walls at |d| = halfWidth. `pr` = track.project(car) result (d, heading).
- * Pushes the car back inside and reflects velocity. Returns the impact speed (normal component) or 0.
- */
-export function resolveWall(car, pr, halfWidth) {
+/** Pure: armor damage for a wall hit of the given normal impact speed (0 below the threshold). */
+export function wallDamage(impact) {
+  return impact > WALL.dmgMin ? (impact - WALL.dmgMin) * WALL.dmgK : 0;
+}
+
+/** Deepest body corner past `limit` from the centreline: { depth, sign } (depth <= 0 = clear). */
+function worstCorner(car, pr, limit) {
   const dpsi = wrapAngle(car.heading - pr.heading);
   const sd = Math.sin(dpsi), cd = Math.cos(dpsi);
-  let worst = 0, worstSign = 0;
+  let worst = -Infinity, worstSign = 0;
   for (const cx of [CAR_HALF_LENGTH, -CAR_HALF_LENGTH]) {
     for (const cy of [CAR_HALF_WIDTH, -CAR_HALF_WIDTH]) {
       const dc = pr.d + cx * sd + cy * cd;
-      const pen = Math.abs(dc) - halfWidth;
+      const pen = Math.abs(dc) - limit;
       if (pen > worst) { worst = pen; worstSign = dc > 0 ? 1 : -1; }
     }
   }
+  return { depth: worst, sign: worstSign, dpsi };
+}
+
+/** Heading of the wall tangent closest to the car's heading (the way the car "wants" to run along the wall). */
+function alongWall(car, pr) {
+  const dpsi = wrapAngle(car.heading - pr.heading);
+  if (Math.abs(Math.abs(dpsi) - Math.PI / 2) < 0.25) return pr.heading;        // square-on: follow the track direction
+  return Math.abs(dpsi) > Math.PI / 2 ? wrapAngle(pr.heading + Math.PI) : pr.heading;
+}
+
+/**
+ * Soft run-off band: a gentle inward push and some outward-speed bleed before the solid wall, so brushing the edge
+ * nudges the car back instead of stopping it. Call before resolveWall. Returns the band depth 0..1 (0 = clear).
+ */
+export function softEdge(car, pr, halfWidth, dt = SIM_DT) {
+  const { depth, sign } = worstCorner(car, pr, halfWidth - WALL.soft);
+  if (depth <= 0) return 0;
+  const k = clamp(depth / WALL.soft, 0, 1);
+  const nx = -Math.sin(pr.heading), ny = Math.cos(pr.heading);
+  const inX = -sign * nx, inY = -sign * ny;
+  const vn = car.vx * inX + car.vy * inY;       // < 0: moving toward the wall
+  const push = WALL.softPush * k * dt;
+  const bleed = vn < 0 ? vn * Math.min(1, WALL.softBleed * k * dt) : 0;
+  car.vx += inX * (push - bleed); car.vy += inY * (push - bleed);
+  const err = wrapAngle(alongWall(car, pr) - car.heading);
+  car.heading = wrapAngle(car.heading + err * Math.min(1, 4 * k * dt));
+  return k;
+}
+
+/**
+ * Track edges are walls at |d| = halfWidth. `pr` = track.project(car) result (d, heading).
+ * Pushes the car back inside and deflects it along the wall: glancing blows keep nearly all of their speed, only a
+ * near-perpendicular hit scrubs it. Returns the impact speed (normal component) or 0.
+ */
+export function resolveWall(car, pr, halfWidth) {
+  const { depth: worst, sign: worstSign } = worstCorner(car, pr, halfWidth);
   if (worst <= 0) return 0;
   const nx = -Math.sin(pr.heading), ny = Math.cos(pr.heading);   // right normal
   const inX = -worstSign * nx, inY = -worstSign * ny;            // towards the track
@@ -32,13 +80,17 @@ export function resolveWall(car, pr, halfWidth) {
   if (vn < 0) {
     impact = -vn;
     const tx = car.vx - vn * inX, ty = car.vy - vn * inY;
-    const tf = impact > 1 ? 0.9 : 0.985;
+    // Coulomb-style wall friction: the tangential speed lost is proportional to the normal speed absorbed, so a glancing
+    // blow (small normal component) barely slows the car while a square hit scrubs most of it
+    const tl = Math.hypot(tx, ty) || 1;
+    const tf = Math.max(0, tl - WALL.friction * (1 + WALL_RESTITUTION) * impact) / tl;
     car.vx = tx * tf + inX * impact * WALL_RESTITUTION;
     car.vy = ty * tf + inY * impact * WALL_RESTITUTION;
-    // swing the nose along the wall
-    const nudge = clamp(-dpsi * 1.5, -0.8, 0.8) * Math.min(1, impact / 8);
-    car.yawRate = clamp(car.yawRate * 0.6 + nudge, -3.2, 3.2);
   }
+  // swing the nose along the wall (and stop the yaw from spinning the car off it)
+  const err = wrapAngle(alongWall(car, pr) - car.heading);
+  car.heading = wrapAngle(car.heading + err * Math.min(1, WALL.align * SIM_DT));
+  car.yawRate = clamp(car.yawRate * 0.8 + clamp(err * 2, -2, 2) * 0.2, -3.2, 3.2);
   return impact;
 }
 

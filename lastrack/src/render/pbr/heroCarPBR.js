@@ -4,12 +4,32 @@
 import * as THREE from 'three';
 import { mergeGeo, xf, roundedBox, ribbon, tube, triCount, clamp, smoothstep, lerp } from './geo.js';
 import { buildBodyGeometries, applyDents, buildCanopy, buildRoofPanel, canopyPoint, sectionAt, WHEELS, CAN_NU, CAN_NX } from './carBody.js';
+import { zoneFrames } from './carBody.js';
+import { getPaint } from '../../data/liveries.js';
+import { composeBodyDecals, composeRoofDecals } from '../decalArt.js';
 import { flakeNormal, carbonMaps, treadNormal, brushedMaps, glowSprite } from './maps.js';
 
 export const PBR_SPEC = Object.freeze({
   length: 5.3, width: 2.45, wheelR: WHEELS.radius, wheelW: WHEELS.width,
   turret: [-0.3, 1.53, 0], exhaust: [[-2.7, 0.46, 0.46], [-2.7, 0.46, -0.46]], thrusters: [[-2.76, 0.54, 0.84], [-2.76, 0.54, -0.84]], engine: [1.5, 1.0, 0], muzzle: [0.95, 1.62, 0],
 });
+
+/**
+ * Car variants (same procedural build, different proportions + extras): hammer = muscle car, wasp = low/wide interceptor,
+ * bulwark = tall armoured juggernaut. sx/sy/sz scale the sprung body, ws the wheels.
+ */
+export const VARIANTS = {
+  hammer: { sx: 1, sy: 1, sz: 1, ws: 1, plates: true, paint: { metalness: 0.62, roughness: 0.3, clearcoat: 1 }, turrets: [{ x: -0.3, y: 1.53, z: 0, twin: true, scale: 1 }], thrusters: PBR_SPEC.thrusters, length: 5.3, width: 2.45 },
+  wasp: { sx: 1, sy: 0.76, sz: 1.05, ws: 0.78, plates: false, paint: { metalness: 0.85, roughness: 0.2, clearcoat: 1 }, turrets: [{ x: -0.25, y: 1.53, z: 0, twin: false, scale: 0.8 }], thrusters: PBR_SPEC.thrusters, length: 5.3, width: 2.6 },
+  bulwark: { sx: 0.97, sy: 1.3, sz: 1.12, ws: 1.28, plates: true, paint: { metalness: 0.35, roughness: 0.55, clearcoat: 0.35 }, turrets: [{ x: -0.45, y: 1.64, z: 0.52, twin: false, scale: 0.85 }, { x: -0.45, y: 1.64, z: -0.52, twin: false, scale: 0.85 }], thrusters: [[-3.1, 0.9, 0.75], [-3.1, 0.9, -0.75]], length: 5.3, width: 2.8 },
+};
+/** World-frame (car-local) muzzle positions of a variant: { x, y, zs:[..] } — every barrel tip, for tracers / muzzle particles. */
+export function carMuzzle(carId = 'hammer') {
+  const V = VARIANTS[carId] || VARIANTS.hammer, zs = [];
+  let x = 0, y = 0;
+  for (const t of V.turrets) { x = Math.max(x, (t.x + 1.7 * t.scale) * V.sx); y = (t.y + 0.24 * t.scale) * V.sy; for (const bz of t.twin ? [0.14, -0.14] : [0]) zs.push((t.z + bz * t.scale) * V.sz); }
+  return { x, y, zs };
+}
 
 // ------------------------------------------------------------------ pure look model (shared with tests)
 export function damageLook(frac, wrecked) {
@@ -72,12 +92,12 @@ function wheelParts() {
 }
 
 function carbonKit() {
-  const parts = [];
-  const splitter = roundedBox(0.7, 0.03, 1.95, 0.012, 3); xf(splitter, { pos: [2.55, 0.2, 0] }); parts.push(splitter);
-  const noseLip = roundedBox(0.1, 0.06, 1.5, 0.02, 2); xf(noseLip, { pos: [2.78, 0.22, 0], rot: [0, 0, -0.2] }); parts.push(noseLip);
-  for (const sd of [1, -1]) { const intake = roundedBox(0.26, 0.1, 0.3, 0.03, 2); xf(intake, { pos: [2.4, 0.4, sd * 0.78], rot: [0, -sd * 0.5, 0] }); parts.push(intake); }
+  const parts = [], F = [], R = [];
+  const splitter = roundedBox(0.7, 0.03, 1.95, 0.012, 3); xf(splitter, { pos: [2.55, 0.2, 0] }); F.push(splitter);
+  const noseLip = roundedBox(0.1, 0.06, 1.5, 0.02, 2); xf(noseLip, { pos: [2.78, 0.22, 0], rot: [0, 0, -0.2] }); F.push(noseLip);
+  for (const sd of [1, -1]) { const intake = roundedBox(0.26, 0.1, 0.3, 0.03, 2); xf(intake, { pos: [2.4, 0.4, sd * 0.78], rot: [0, -sd * 0.5, 0] }); F.push(intake); }
   for (const s of [1, -1]) {
-    const canard = roundedBox(0.32, 0.025, 0.22, 0.01, 2); xf(canard, { pos: [2.25, 0.36, s * 0.98], rot: [s * 0.15, -s * 0.2, 0.12] }); parts.push(canard);
+    const canard = roundedBox(0.32, 0.025, 0.22, 0.01, 2); xf(canard, { pos: [2.25, 0.36, s * 0.98], rot: [s * 0.15, -s * 0.2, 0.12] }); F.push(canard);
     const skirt = roundedBox(2.5, 0.07, 0.1, 0.025, 3); xf(skirt, { pos: [0.1, 0.3, s * 1.12] }); parts.push(skirt);
     const skirt2 = roundedBox(2.3, 0.025, 0.2, 0.01, 2); xf(skirt2, { pos: [0.1, 0.27, s * 1.1] }); parts.push(skirt2);
     const mirror = roundedBox(0.16, 0.1, 0.2, 0.04, 3); xf(mirror, { pos: [0.85, 1.03, s * 1.1], rot: [0, s * 0.4, 0] }); parts.push(mirror);
@@ -85,16 +105,16 @@ function carbonKit() {
     const endplate = roundedBox(0.5, 0.34, 0.025, 0.012, 2); xf(endplate, { pos: [-2.5, 1.32, s * 0.98] }); parts.push(endplate);
     const strut = roundedBox(0.08, 0.34, 0.05, 0.02, 2); xf(strut, { pos: [-2.38, 1.12, s * 0.5] }); parts.push(strut);
   }
-  const diffuser = roundedBox(0.5, 0.05, 1.7, 0.015, 3); xf(diffuser, { pos: [-2.6, 0.3, 0], rot: [0, 0, 0.22] }); parts.push(diffuser);
-  for (let k = -3; k <= 3; k++) { const fin = roundedBox(0.5, 0.14, 0.02, 0.008, 1); xf(fin, { pos: [-2.62, 0.34, k * 0.24], rot: [0, 0, 0.22] }); parts.push(fin); }
+  const diffuser = roundedBox(0.5, 0.05, 1.7, 0.015, 3); xf(diffuser, { pos: [-2.6, 0.3, 0], rot: [0, 0, 0.22] }); R.push(diffuser);
+  for (let k = -3; k <= 3; k++) { const fin = roundedBox(0.5, 0.14, 0.02, 0.008, 1); xf(fin, { pos: [-2.62, 0.34, k * 0.24], rot: [0, 0, 0.22] }); R.push(fin); }
   const roof = roundedBox(0.04, 0.04, 0.04, 0.01, 1); parts.push(roof);
-  const lip = roundedBox(0.3, 0.025, 1.7, 0.01, 2); xf(lip, { pos: [-2.42, 1.27, 0], rot: [0, 0, 0.1] }); parts.push(lip);   // fixed wing main plane
+  const lip = roundedBox(0.3, 0.025, 1.7, 0.01, 2); xf(lip, { pos: [-2.42, 1.27, 0], rot: [0, 0, 0.1] }); R.push(lip);   // fixed wing main plane
   // sharp front: angular wedge bumper + carbon frame around the intake
   const sh = new THREE.Shape(); sh.moveTo(2.28, -0.84); sh.lineTo(2.74, -0.52); sh.lineTo(2.74, 0.52); sh.lineTo(2.28, 0.84); sh.closePath();
-  const wedge = new THREE.ExtrudeGeometry(sh, { depth: 0.1, bevelEnabled: false }); wedge.rotateX(-Math.PI / 2); wedge.deleteAttribute('uv'); xf(wedge, { pos: [0, 0.31, 0] }); parts.push(wedge);
-  for (const y of [0.442, 0.64]) { const rail = roundedBox(0.07, 0.025, 1.12, 0.008, 1); xf(rail, { pos: [2.62, y, 0] }); parts.push(rail); }
-  for (const z of [-0.54, 0.54]) { const post = roundedBox(0.07, 0.23, 0.03, 0.008, 1); xf(post, { pos: [2.62, 0.54, z] }); parts.push(post); }
-  return mergeGeo(parts);
+  const wedge = new THREE.ExtrudeGeometry(sh, { depth: 0.1, bevelEnabled: false }); wedge.rotateX(-Math.PI / 2); wedge.deleteAttribute('uv'); xf(wedge, { pos: [0, 0.31, 0] }); F.push(wedge);
+  for (const y of [0.442, 0.64]) { const rail = roundedBox(0.07, 0.025, 1.12, 0.008, 1); xf(rail, { pos: [2.62, y, 0] }); F.push(rail); }
+  for (const z of [-0.54, 0.54]) { const post = roundedBox(0.07, 0.23, 0.03, 0.008, 1); xf(post, { pos: [2.62, 0.54, z] }); F.push(post); }
+  return { main: mergeGeo(parts), front: mergeGeo(F), rear: mergeGeo(R) };
 }
 function wingFlap() {
   const sh = new THREE.Shape(); sh.moveTo(0, 0); sh.quadraticCurveTo(0.12, 0.05, 0.34, 0.01); sh.lineTo(0.34, -0.005); sh.quadraticCurveTo(0.12, 0.0, 0, -0.012); sh.closePath();
@@ -104,10 +124,10 @@ function wingFlap() {
 function armour() {
   const parts = [], side = (x, y, w, h, t, s, tilt = 0) => { const sec = sectionAt(x); const g = roundedBox(w, h, t, Math.min(0.025, t * 0.4), 2); xf(g, { pos: [x, y, s * (sec.hw + t * 0.45)], rot: [0, -s * tilt, 0] }); parts.push(g); return g; };
   for (const s of [1, -1]) {
-    side(0.05, 0.62, 1.05, 0.5, 0.05, s);                // door plate
+    side(0.05, 0.52, 1.05, 0.3, 0.05, s);                // door plate (low: the upper door stays free for decals)
     side(-1.55, 0.7, 1.05, 0.42, 0.05, s, 0.03);          // rear quarter plate
     side(1.95, 0.55, 0.85, 0.32, 0.05, s, 0.08);          // front fender plate
-    for (const [x, y] of [[-0.42, 0.82], [0.52, 0.82], [-0.42, 0.44], [0.52, 0.44]]) { const sec = sectionAt(x); const r = new THREE.CylinderGeometry(0.018, 0.018, 0.02, 8); r.rotateX(Math.PI / 2); xf(r, { pos: [x, y, s * (sec.hw + 0.052)] }); parts.push(r); }
+    for (const [x, y] of [[-0.42, 0.6], [0.52, 0.6], [-0.42, 0.44], [0.52, 0.44]]) { const sec = sectionAt(x); const r = new THREE.CylinderGeometry(0.018, 0.018, 0.02, 8); r.rotateX(Math.PI / 2); xf(r, { pos: [x, y, s * (sec.hw + 0.052)] }); parts.push(r); }
     const vent = roundedBox(0.5, 0.04, 0.16, 0.012, 2); xf(vent, { pos: [1.45, 0.98, s * 0.55] }); parts.push(vent);
   }
   const ram = roundedBox(0.16, 0.2, 1.1, 0.05, 3); xf(ram, { pos: [2.62, 0.42, 0] }); parts.push(ram);                   // ram bar
@@ -249,36 +269,75 @@ function pillars(canopy) {
   const bp = []; for (let j = 0; j < CAN_NU; j++) bp.push(canopyPoint(canopy, bpx, j, 0.012)); parts.push(ribbon(bp, 0.05, [0, 1, 0]));
   return mergeGeo(parts);
 }
-function turretParts() {
+function turretParts({ twin = true, scale = 1 } = {}) {
   const base = [], gun = [];
   const ring = new THREE.CylinderGeometry(0.3, 0.34, 0.1, 28); xf(ring, { pos: [0, -0.04, 0] }); base.push(ring);
   const rotor = new THREE.CylinderGeometry(0.26, 0.29, 0.1, 28); xf(rotor, { pos: [0, 0.05, 0] }); base.push(rotor);
   const house = roundedBox(0.78, 0.26, 0.66, 0.1, 5); xf(house, { pos: [0.02, 0.22, 0] }); base.push(house);
   for (const s of [1, -1]) { const fair = roundedBox(0.52, 0.2, 0.12, 0.05, 3); xf(fair, { pos: [-0.02, 0.2, s * 0.36], rot: [0, s * 0.1, 0] }); base.push(fair); const drum = new THREE.CylinderGeometry(0.1, 0.1, 0.2, 14); drum.rotateX(Math.PI / 2); xf(drum, { pos: [-0.28, 0.24, s * 0.4] }); base.push(drum); }
   const shield = roundedBox(0.14, 0.2, 0.5, 0.05, 3); xf(shield, { pos: [0.44, 0.24, 0] }); base.push(shield);
-  for (const z of [0.14, -0.14]) {
+  for (const z of twin ? [0.14, -0.14] : [0]) {
     const barrel = new THREE.CylinderGeometry(0.042, 0.046, 1.3, 20); barrel.rotateZ(Math.PI / 2); xf(barrel, { pos: [1.0, 0.24, z] }); gun.push(barrel);
     const sleeve = new THREE.CylinderGeometry(0.066, 0.066, 0.55, 20); sleeve.rotateZ(Math.PI / 2); xf(sleeve, { pos: [0.62, 0.24, z] }); gun.push(sleeve);
     const brake = new THREE.CylinderGeometry(0.07, 0.06, 0.16, 18); brake.rotateZ(Math.PI / 2); xf(brake, { pos: [1.62, 0.24, z] }); gun.push(brake);
   }
   const ensure = (g) => { if (!g.attributes.uv) g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2)); return g; };
   const eye = new THREE.SphereGeometry(0.05, 12, 8); xf(eye, { pos: [0.4, 0.38, 0] });
-  return { base: mergeGeo(base.map(ensure)), gun: mergeGeo(gun.map(ensure)), eye };
+  const out = { base: mergeGeo(base.map(ensure)), gun: mergeGeo(gun.map(ensure)), eye };
+  if (scale !== 1) { out.base.scale(scale, scale, scale); out.gun.scale(scale, scale, scale); eye.scale(scale, scale, scale); }
+  return out;
 }
 function flameCone(r, len) { const g = new THREE.ConeGeometry(r, len, 14, 1, true); g.rotateZ(Math.PI / 2); g.translate(-len / 2, 0, 0); g.rotateY(Math.PI); g.rotateY(Math.PI); return g; }
+
+// ------------------------------------------------------------------ variant extras
+const ensureUV = (g) => { if (!g.attributes.uv) g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2)); if (!g.attributes.normal) g.computeVertexNormals(); return g; };
+/** Interceptor: dorsal fin, big canards, side scoops (carbon) + blade lights (emissive). */
+function interceptorExtras() {
+  const carbon = [], glow = [];
+  const fin = roundedBox(1.3, 0.55, 0.035, 0.015, 2); xf(fin, { pos: [-1.35, 1.36, 0], rot: [0, 0, 0.2] }); carbon.push(fin);
+  for (const s of [1, -1]) {
+    const can = roundedBox(0.6, 0.03, 0.45, 0.012, 2); xf(can, { pos: [2.0, 0.48, s * 1.2], rot: [s * 0.18, -s * 0.25, 0.1] }); carbon.push(can);
+    const scoop = roundedBox(0.8, 0.14, 0.12, 0.04, 2); xf(scoop, { pos: [-0.85, 0.72, s * 1.16], rot: [0, s * 0.08, 0] }); carbon.push(scoop);
+    const sideBlade = roundedBox(0.9, 0.03, 0.05, 0.01, 1); xf(sideBlade, { pos: [2.12, 0.69, s * 0.8], rot: [0, -s * 0.9, 0] }); glow.push(sideBlade);
+    const tailBlade = roundedBox(0.04, 0.025, 0.7, 0.01, 1); xf(tailBlade, { pos: [-2.64, 1.02, s * 0.42] }); glow.push(tailBlade);
+  }
+  const noseBlade = roundedBox(0.04, 0.025, 1.1, 0.01, 1); xf(noseBlade, { pos: [2.6, 0.585, 0] }); glow.push(noseBlade);
+  return { carbon: mergeGeo(carbon.map(ensureUV)), glow: mergeGeo(glow.map(ensureUV)) };
+}
+/** Juggernaut: ram plate, flank slabs, roof armour, rear thruster pods, exhaust stacks (gunmetal). */
+function juggernautExtras() {
+  const metal = [];
+  const ram = roundedBox(0.3, 0.8, 2.05, 0.05, 3); xf(ram, { pos: [2.78, 0.5, 0] }); metal.push(ram);
+  const ramTop = roundedBox(0.8, 0.08, 1.95, 0.03, 2); xf(ramTop, { pos: [2.5, 0.96, 0], rot: [0, 0, -0.38] }); metal.push(ramTop);
+  for (const s of [1, -1]) {
+    const flank = roundedBox(2.7, 0.36, 0.13, 0.03, 2); xf(flank, { pos: [-0.1, 0.5, s * 1.17] }); metal.push(flank);
+    const flank2 = roundedBox(1.2, 0.36, 0.11, 0.03, 2); xf(flank2, { pos: [-1.75, 0.82, s * 1.15] }); metal.push(flank2);
+    for (const x of [-1.2, -0.3, 0.6, 1.2]) { const r = new THREE.CylinderGeometry(0.03, 0.03, 0.04, 8); r.rotateX(Math.PI / 2); xf(r, { pos: [x, 0.5, s * 1.245] }); metal.push(r); }
+    const pod = roundedBox(0.8, 0.6, 0.55, 0.08, 3); xf(pod, { pos: [-2.7, 0.9, s * 0.75] }); metal.push(pod);
+    const bell = new THREE.CylinderGeometry(0.2, 0.13, 0.4, 20, 1, true); bell.rotateZ(Math.PI / 2); xf(bell, { pos: [-3.1, 0.9, s * 0.75] }); metal.push(bell);
+    const stack = new THREE.CylinderGeometry(0.075, 0.075, 1.0, 12); xf(stack, { pos: [-1.3, 1.5, s * 0.86] }); metal.push(stack);
+    const cap = new THREE.CylinderGeometry(0.1, 0.075, 0.08, 12); xf(cap, { pos: [-1.3, 2.0, s * 0.86] }); metal.push(cap);
+  }
+  const roof = roundedBox(1.6, 0.1, 1.9, 0.035, 2); xf(roof, { pos: [-0.35, 1.58, 0] }); metal.push(roof);
+  for (const z of [-0.95, 0.95]) { const rail = roundedBox(1.7, 0.12, 0.08, 0.02, 1); xf(rail, { pos: [-0.35, 1.52, z] }); metal.push(rail); }
+  const bar = roundedBox(0.12, 0.12, 2.2, 0.04, 2); xf(bar, { pos: [2.95, 0.84, 0] }); metal.push(bar);
+  return { metal: mergeGeo(metal.map(ensureUV)) };
+}
 
 // ------------------------------------------------------------------ materials
 function paintMaterial(color, tex, uni) {
   const m = new THREE.MeshPhysicalMaterial({ side: THREE.DoubleSide, color, metalness: 0.62, roughness: 0.3, clearcoat: 1, clearcoatRoughness: 0.035, normalMap: tex.flake, normalScale: new THREE.Vector2(0.13, 0.13), envMapIntensity: 1.25, sheen: 0 });
   m.onBeforeCompile = (sh) => {
-    sh.uniforms.uDirt = uni.uDirt; sh.uniforms.uWet = uni.uWet;
-    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float aDirt; varying float vDirt;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvDirt = aDirt;');
-    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uDirt; uniform float uWet; varying float vDirt;')
-      .replace('#include <color_fragment>', '#include <color_fragment>\nfloat dirtK = clamp(uDirt * (0.2 + vDirt * 1.1), 0.0, 1.0);\ndiffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.16,0.12,0.09), dirtK*0.88); diffuseColor.rgb *= 1.0 - uWet*0.2;')
-      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.96, dirtK); roughnessFactor = mix(roughnessFactor, roughnessFactor*0.5, uWet*(1.0-dirtK));')
+    sh.uniforms.uDirt = uni.uDirt; sh.uniforms.uWet = uni.uWet; sh.uniforms.tDecal = uni.tDecal; sh.uniforms.uDecalOn = uni.uDecalOn;
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float aDirt; varying float vDirt; attribute vec2 aDecalUv; varying vec2 vDecalUv;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvDirt = aDirt; vDecalUv = aDecalUv;');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uDirt; uniform float uWet; varying float vDirt; uniform sampler2D tDecal; uniform float uDecalOn; varying vec2 vDecalUv;')
+      
+      .replace('#include <color_fragment>', '#include <color_fragment>\nvec4 dcl = texture2D(tDecal, vDecalUv) * uDecalOn; diffuseColor.rgb = mix(diffuseColor.rgb, dcl.rgb, dcl.a);\nfloat dirtK = clamp(uDirt * (0.2 + vDirt * 1.1), 0.0, 1.0);\ndiffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.16,0.12,0.09), dirtK*0.88); diffuseColor.rgb *= 1.0 - uWet*0.2;')
+      .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\nmetalnessFactor = mix(metalnessFactor, 0.12, dcl.a);')
+      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.42, dcl.a); roughnessFactor = mix(roughnessFactor, 0.96, dirtK); roughnessFactor = mix(roughnessFactor, roughnessFactor*0.5, uWet*(1.0-dirtK));')
       .replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\n#ifdef USE_CLEARCOAT\nmaterial.clearcoat *= 1.0 - dirtK*0.96; material.clearcoatRoughness = mix(mix(material.clearcoatRoughness, 0.6, dirtK), 0.01, uWet*(1.0-dirtK));\n#endif');
   };
-  m.customProgramCacheKey = () => 'heropaint-v1';
+  m.customProgramCacheKey = () => 'heropaint-v2';
   return m;
 }
 
@@ -286,14 +345,18 @@ function paintMaterial(color, tex, uni) {
  * buildHeroCarPBR({ color, accent, number }) -> THREE.Group with userData.hero = api (same contract as the palette hero):
  * api.update(state, dt, opts) with state = { speed, steer, ax, ay, throttle, braking, wheelspin, slip, firing, frac, dmg, wrecked, aim, rough, reversing, wet, dirt, rpm }.
  */
-export function buildHeroCarPBR({ color = 0xc8501a, accent = 0x35e6ff, number = '9' } = {}) {
+export function buildHeroCarPBR({ color = 0xc8501a, accent = 0x35e6ff, number = '9', carId = 'hammer', livery = null } = {}) {
   void number;
+  const V = VARIANTS[carId] || VARIANTS.hammer;
   const tex = carTextures();
-  const uni = { uDirt: { value: 0 }, uWet: { value: 0 } };
+  const blank = new THREE.DataTexture(new Uint8Array([0, 0, 0, 0]), 1, 1); blank.needsUpdate = true;
+  const uni = { uDirt: { value: 0 }, uWet: { value: 0 }, tDecal: { value: blank }, uDecalOn: { value: 0 } };
+  if (livery && livery.paintHex !== undefined) color = livery.paintHex;
+  if (livery && livery.accentHex !== undefined) accent = livery.accentHex;
   const bg = buildBodyGeometries();
   const canopy = buildCanopy(), roofGeo = buildRoofPanel(canopy);
-  const root = new THREE.Group(); root.name = 'car-hammer-pbr';
-  const sprung = new THREE.Group(); root.add(sprung);
+  const root = new THREE.Group(); root.name = 'car-hammer-pbr'; root.userData.variant = carId;
+  const sprung = new THREE.Group(); root.add(sprung); sprung.scale.set(V.sx, V.sy, V.sz);
   const mats = {
     paint: paintMaterial(new THREE.Color(color), tex, uni),
     carbon: new THREE.MeshPhysicalMaterial({ side: THREE.DoubleSide, map: tex.carbonA, normalMap: tex.carbonN, roughnessMap: tex.carbonR, roughness: 1, metalness: 0.25, clearcoat: 1, clearcoatRoughness: 0.06, envMapIntensity: 1.0 }),
@@ -317,53 +380,97 @@ export function buildHeroCarPBR({ color = 0xc8501a, accent = 0x35e6ff, number = 
     eye: new THREE.MeshBasicMaterial({ color: new THREE.Color(accent).multiplyScalar(4) }),
     glowDecal: new THREE.MeshBasicMaterial({ map: tex.glow, color: new THREE.Color(accent).multiplyScalar(0.8), transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false }),
   };
+  let finish = { ...V.paint };
+  Object.assign(mats.paint, finish); mats.paint.normalScale.setScalar(0.13);
   const mesh = (g, m, name, cast = true, recv = false) => { const o = new THREE.Mesh(g, m); o.name = name; o.castShadow = cast; o.receiveShadow = recv; return o; };
   const body = mesh(bg.body, mats.paint, 'body', true, true), hood = mesh(bg.hood, mats.paint, 'hood', true, true);
   const glass = mesh(canopy, mats.glass, 'glass', false);
-  const kit = mesh(mergeGeo([carbonKit(), roofGeo, pillars(canopy)]), mats.carbon, 'aero'),   // aero kit + roof panel + pillars in one draw call
+  const ck = carbonKit(), kit = mesh(mergeGeo([ck.main, roofGeo, pillars(canopy)]), mats.carbon, 'aero'),   // aero kit + roof panel + pillars in one draw call
+     kitF = mesh(ck.front, mats.carbon, 'aero-front'), kitR = mesh(ck.rear, mats.carbon, 'aero-rear'),   // bumper / diffuser: peel off separately
      flap = mesh(wingFlap(), mats.carbon, 'wing-flap'); flap.position.set(-2.62, 1.3, 0);
   const plates = mesh(armour(), mats.gun, 'armour');
   const cabin = mesh(interior(), mats.interior, 'interior', false), disp = mesh(displays(), mats.display, 'displays', false);
   const heads = mesh(headLights(), mats.head, 'headlights', false), tails = mesh(tailLights(), mats.tail, 'taillights', false), revs = mesh(reverseLights(), mats.rev, 'reverse', false);
   const under = mesh(underglow(), mats.under, 'underglow', false), gaps = mesh(mergeGeo([panelGaps(canopy), pillars(canopy)]), mats.gap, 'gaps', false);
   const inn = internals(), innDark = mesh(inn.dark, mats.dark, 'internals-dark', false), innMetal = mesh(inn.metal, mats.gun, 'internals-metal', true);
-  sprung.add(innDark, innMetal, innDark, innMetal, body, hood, glass, kit, flap, plates, cabin, disp, heads, tails, revs, under, gaps);
+  sprung.add(innDark, innMetal, innDark, innMetal, body, hood, glass, kit, kitF, kitR, flap, plates, cabin, disp, heads, tails, revs, under, gaps);
   gaps.geometry = panelGaps(canopy);
   // underglow decal on the ground (unsprung)
-  const decal = new THREE.Mesh(new THREE.PlaneGeometry(6.4, 3.4).rotateX(-Math.PI / 2), mats.glowDecal); decal.position.set(0, 0.03, 0); decal.name = 'underglow-decal'; decal.renderOrder = 2; root.add(decal);
+  const decal = new THREE.Mesh(new THREE.PlaneGeometry(6.4, 3.4).rotateX(-Math.PI / 2), mats.glowDecal); decal.position.set(0, 0.03, 0); decal.name = 'underglow-decal'; decal.renderOrder = 2; decal.scale.set(V.sx, 1, V.sz); root.add(decal);
   // engine bay + bay fire
   const bay = { visible: false };   // the real engine bay is in internals(); nothing to toggle
   const fire = new THREE.Group(); for (let k = 0; k < 3; k++) { const f = new THREE.Mesh(new THREE.ConeGeometry(0.16 + k * 0.04, 0.8 + k * 0.2, 10, 1, true), mats.fire); f.position.set(1.4 + k * 0.28 - 0.2, 1.3, (k - 1) * 0.28); fire.add(f); } fire.visible = false; sprung.add(fire);
-  // turret
-  const tp = turretParts();
-  const turret = new THREE.Group(); turret.position.set(...PBR_SPEC.turret); sprung.add(turret);
-  const rotor = new THREE.Group(); turret.add(rotor);
-  const tBase = mesh(tp.base, mats.gun, 'turret-base'), tGun = mesh(tp.gun, mats.gun, 'barrels'), tEye = mesh(tp.eye, mats.eye, 'turret-eye', false);
+  // turrets: fixed forward mounts (hammer: twin roof gun, wasp: single, bulwark: two single guns)
   const flashG = new THREE.ConeGeometry(0.11, 0.55, 8, 1, true); flashG.rotateZ(-Math.PI / 2); flashG.translate(0.28, 0, 0);
-  const flashes = [0.14, -0.14].map((z) => { const f = new THREE.Mesh(flashG, mats.flash); f.position.set(1.7, 0.24, z); f.visible = false; return f; });
-  rotor.add(tBase, tGun, tEye, ...flashes);
+  const tAll = V.turrets.map((tc) => {
+    const tp = turretParts({ twin: tc.twin, scale: tc.scale }), group = new THREE.Group(); group.position.set(tc.x, tc.y, tc.z); sprung.add(group);
+    const rotor = new THREE.Group(); group.add(rotor);
+    const base = mesh(tp.base, mats.gun, 'turret-base'), gun = mesh(tp.gun, mats.gun, 'barrels'), eye = mesh(tp.eye, mats.eye, 'turret-eye', false);
+    const flashes = (tc.twin ? [0.14, -0.14] : [0]).map((z) => { const f = new THREE.Mesh(flashG, mats.flash); f.position.set(1.7 * tc.scale, 0.24 * tc.scale, z * tc.scale); f.scale.setScalar(tc.scale); f.visible = false; return f; });
+    rotor.add(base, gun, eye, ...flashes);
+    return { group, rotor, base, gun, eye, flashes, sc: tc.scale };
+  });
+  const T0 = tAll[0], turret = T0.group, rotor = T0.rotor, tBase = T0.base, tGun = T0.gun, tEye = T0.eye, flashes = tAll.flatMap((t) => t.flashes);
+  // variant extras
+  const extras = [];
+  if (carId === 'wasp') { const ex = interceptorExtras(); extras.push(mesh(ex.carbon, mats.carbon, 'extras-carbon'), mesh(ex.glow, mats.head, 'extras-blades', false)); mats.head.color.setRGB(1.2, 2.0, 2.6); }
+  if (carId === 'bulwark') { const ex = juggernautExtras(); extras.push(mesh(ex.metal, mats.gun, 'extras-armour')); }
+  for (const e of extras) sprung.add(e);
   // thruster flames
-  const flameG = flameCone(0.1, 1.1), flames = PBR_SPEC.thrusters.map(([x, y, z]) => { const f = new THREE.Mesh(flameG, mats.flame); f.position.set(x - 0.02, y, z); f.visible = false; sprung.add(f); return f; });
+  const flameG = flameCone(0.1, 1.1), flames = V.thrusters.map(([x, y, z]) => { const f = new THREE.Mesh(flameG, mats.flame); f.position.set(x - 0.02, y, z); f.visible = false; sprung.add(f); return f; });
 
   // wheels (instanced)
   const wp = wheelParts();
   const mkI = (g, m, name, cast) => { const im = new THREE.InstancedMesh(g, m, 4); im.name = name; im.castShadow = cast; im.frustumCulled = false; im.instanceMatrix.setUsage(THREE.DynamicDrawUsage); root.add(im); return im; };
   const iTyre = mkI(wp.tyre, mats.tyre, 'tyres', true), iRim = mkI(wp.rim, mats.rim, 'rims', true), iDisc = mkI(wp.disc, mats.disc, 'discs', false), iCal = mkI(wp.caliper, mats.caliper, 'calipers', false);
-  const slots = [[WHEELS.front, WHEELS.track, 1, true], [WHEELS.front, -WHEELS.track, -1, true], [WHEELS.rear, WHEELS.track, 1, false], [WHEELS.rear, -WHEELS.track, -1, false]];
+  const fx = WHEELS.front * V.sx, rx = WHEELS.rear * V.sx, tz = WHEELS.track * V.sz, WR = WHEELS.radius * V.ws;
+  const slots = [[fx, tz, 1, true], [fx, -tz, -1, true], [rx, tz, 1, false], [rx, -tz, -1, false]];
 
-  const S = { pitch: 0, pitchV: 0, roll: 0, rollV: 0, heave: 0, heaveV: 0, spin: 0, dentKey: '', stage: 0, turretYaw: 0, turretPitch: 0, flap: 0.2, heat: 0, t: 0, brakeOn: null, charred: false };
+  const S = { pitch: 0, pitchV: 0, roll: 0, rollV: 0, heave: 0, heaveV: 0, spin: 0, dentKey: '', stage: 0, turretYaw: 0, turretPitch: 0, flap: 0.2, heat: 0, t: 0, brakeOn: null, charred: false, lost: {} };
   const dummy = new THREE.Object3D(), tmp = new THREE.Matrix4(), qa = new THREE.Quaternion();
-  const charredCol = new THREE.Color(0x0c0b0a), paintCol = new THREE.Color(color);
+  const charredCol = new THREE.Color(0x0c0b0a), paintCol = new THREE.Color(color), accentC = new THREE.Color(accent);
+
+  // ---- livery: paint preset, accent colour, racing number and decals (baked into one canvas texture read by the paint shader)
+  const frames = zoneFrames();
+  let bodyTex = null, bodyCtx = null, roofTex = null, roofCtx = null, roofDecal = null, decalOn = false, hasRoof = false;
+  const tintOf = (id) => (getPaint(id) ? getPaint(id).hex : 0xffffff);
+  function bakeDecals(placements, num) {
+    if (typeof document === 'undefined') return;
+    if (!bodyTex) { const c = document.createElement('canvas'); c.width = 1024; c.height = 512; bodyCtx = c.getContext('2d'); bodyTex = new THREE.CanvasTexture(c); bodyTex.colorSpace = THREE.SRGBColorSpace; bodyTex.anisotropy = 4; }
+    const n = composeBodyDecals(bodyCtx, 1024, 512, placements, frames, tintOf, num || '');
+    bodyTex.needsUpdate = true; decalOn = n > 0; uni.tDecal.value = bodyTex; uni.uDecalOn.value = decalOn && !S.charred ? 1 : 0;
+    hasRoof = placements.some((p) => p.zone === 'roof');
+    if (hasRoof) {
+      if (!roofDecal) {
+        const c = document.createElement('canvas'); c.width = 256; c.height = 256; roofCtx = c.getContext('2d'); roofTex = new THREE.CanvasTexture(c); roofTex.colorSpace = THREE.SRGBColorSpace;
+        const g = roofGeo.clone(), uv = g.attributes.uv, pos = g.attributes.position, nor = g.attributes.normal;
+        for (let i = 0; i < uv.count; i++) { uv.setXY(i, uv.getY(i) / 3, uv.getX(i) / 3); pos.setXYZ(i, pos.getX(i) + nor.getX(i) * 0.004, pos.getY(i) + nor.getY(i) * 0.004, pos.getZ(i) + nor.getZ(i) * 0.004); }
+        roofDecal = new THREE.Mesh(g, new THREE.MeshPhysicalMaterial({ map: roofTex, transparent: true, depthWrite: false, roughness: 0.4, metalness: 0.15, clearcoat: 1, clearcoatRoughness: 0.05, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 }));
+        roofDecal.name = 'roof-decal'; sprung.add(roofDecal);
+      }
+      composeRoofDecals(roofCtx, 256, 256, placements, tintOf, 1.2, 1.3); roofTex.needsUpdate = true;
+    }
+    if (roofDecal) roofDecal.visible = hasRoof && S.stage < 4;
+  }
+  /** Live livery update: { paint (preset id), paintHex, accentHex, number, decals:[{id,zone,tint,scale,rot,mirror}] }. */
+  function setLivery(l = {}) {
+    if (l.paintHex !== undefined) { paintCol.setHex(l.paintHex); if (!S.charred) mats.paint.color.copy(paintCol); }
+    const pr = l.paint ? getPaint(l.paint) : null;
+    if (pr) { finish = { ...pr.finish }; if (!S.charred) Object.assign(mats.paint, finish); }
+    if (l.accentHex !== undefined) { accentC.setHex(l.accentHex); mats.display.color.copy(accentC).multiplyScalar(2.4); mats.eye.color.copy(accentC).multiplyScalar(4); mats.glowDecal.color.copy(accentC).multiplyScalar(0.8); }
+    if (l.decals !== undefined || l.number !== undefined) bakeDecals(l.decals || [], l.number);
+  }
 
   function wheelMatrices(st, look) {
-    const sp = ((st.speed || 0) * (S.dt || 0.016)) / WHEELS.radius;
+    const sp = ((st.speed || 0) * (S.dt || 0.016)) / WR;
     S.spin += sp + (st.wheelspin || 0) * (S.dt || 0.016) * 38;
     const steer = -(st.steer || 0) * 0.42, locked = (st.braking || 0) > 0.97 ? 0 : 1;
     for (let i = 0; i < 4; i++) {
       const [x, z, side, front] = slots[i];
       const yaw = (front ? steer : 0) + (side < 0 ? Math.PI : 0);
-      const y = WHEELS.radius - (look.charred ? 0.07 : 0) + S.heave * 0.0;
-      dummy.position.set(x, y, z); dummy.rotation.set(0, yaw, 0); dummy.scale.set(1, look.charred ? 0.84 : 1, 1);
+      const y = WR - (look.charred ? 0.07 * V.ws : 0) + S.heave * 0.0;
+      const gone = (i === 0 && S.lost.wheelFR) || (i === 3 && S.lost.wheelRL) ? 0 : 1;
+      dummy.position.set(x, y, z); dummy.rotation.set(0, yaw, 0); dummy.scale.set(gone * V.ws, (look.charred ? 0.84 : 1) * gone * V.ws, gone * V.ws);
       dummy.updateMatrix(); tmp.copy(dummy.matrix);
       iCal.setMatrixAt(i, tmp);                                         // caliper: steers, does not spin
       const spin = (side < 0 ? 1 : -1) * S.spin * locked;
@@ -373,6 +480,12 @@ export function buildHeroCarPBR({ color = 0xc8501a, accent = 0x35e6ff, number = 
     for (const im of [iTyre, iRim, iDisc, iCal]) im.instanceMatrix.needsUpdate = true;
   }
 
+  /** Parts torn off by the sim ('partLost' events): hood, doorL/doorR (side armour), bumperF, bumperR, spoiler, turret, wheelFR, wheelRL. */
+  function applyLost(look) {
+    const L = S.lost;
+    hood.visible = look.hood && !L.hood; plates.visible = look.plates && V.plates !== false && !(L.doorL || L.doorR);
+    flap.visible = !L.spoiler; kitF.visible = !L.bumperF; kitR.visible = !L.bumperR; for (const t of tAll) t.group.visible = !L.turret;
+  }
   function update(st, dt, opts = {}) {
     dt = clamp(dt, 0, 0.1); S.dt = dt; S.t += dt;
     const look = damageLook(st.frac ?? 1, !!st.wrecked);
@@ -382,9 +495,10 @@ export function buildHeroCarPBR({ color = 0xc8501a, accent = 0x35e6ff, number = 
       S.dentKey = key;
       if (look.stage !== S.stage) {
         S.stage = look.stage;
-        hood.visible = look.hood; bay.visible = !look.hood; plates.visible = look.plates; glass.visible = look.glass; heads.visible = tails.visible = look.lights; under.visible = decal.visible = look.lights;
-        const charred = look.charred; if (charred !== S.charred) { S.charred = charred; mats.paint.color.copy(charred ? charredCol : paintCol); mats.paint.clearcoat = charred ? 0 : 1; mats.paint.roughness = charred ? 0.9 : 0.3; mats.paint.metalness = charred ? 0.1 : 0.62; mats.paint.normalScale.setScalar(charred ? 0 : 0.13); }
+        hood.visible = look.hood; bay.visible = !look.hood; plates.visible = look.plates && V.plates !== false; glass.visible = look.glass; heads.visible = tails.visible = look.lights; under.visible = decal.visible = look.lights;
+        const charred = look.charred; if (charred !== S.charred) { S.charred = charred; mats.paint.color.copy(charred ? charredCol : paintCol); mats.paint.clearcoat = charred ? 0 : finish.clearcoat; mats.paint.roughness = charred ? 0.9 : finish.roughness; mats.paint.metalness = charred ? 0.1 : finish.metalness; mats.paint.normalScale.setScalar(charred ? 0 : 0.13); }
         fire.visible = look.fire; disp.visible = look.lights;
+        uni.uDecalOn.value = decalOn && !S.charred ? 1 : 0; if (roofDecal) roofDecal.visible = hasRoof && look.stage < 4;
       }
     }
     // suspension springs
@@ -405,14 +519,14 @@ export function buildHeroCarPBR({ color = 0xc8501a, accent = 0x35e6ff, number = 
     mats.tail.color.setRGB(brakeOn ? 2.3 : 0.9, 0.03, 0.04);
     mats.rev.color.setScalar(st.reversing ? 3 : 0.15);
     const pulse = 0.85 + 0.15 * Math.sin(S.t * 3) + (st.throttle || 0) * 0.5;
-    mats.under.color.set(accent).multiplyScalar(0.75 * pulse); mats.glowDecal.opacity = clamp(0.32 + 0.12 * pulse, 0, 0.55);
+    mats.under.color.copy(accentC).multiplyScalar(0.75 * pulse); mats.glowDecal.opacity = clamp(0.32 + 0.12 * pulse, 0, 0.55);
     // adaptive wing + turret
     S.flap += (wingAngle(st.speed || 0, st.braking || 0, ay) - S.flap) * Math.min(1, 7 * dt);
     flap.rotation.z = S.flap;
-    rotor.rotation.y = 0;                    // fixed mount: always points straight ahead (+X); no tracking
-    tGun.position.x = st.firing ? -0.05 * (0.5 + 0.5 * Math.sin(S.t * 90)) : lerp(tGun.position.x, 0, 0.3);
+    for (const t of tAll) { t.rotor.rotation.y = 0; t.gun.position.x = st.firing ? -0.05 * (0.5 + 0.5 * Math.sin(S.t * 90)) : lerp(t.gun.position.x, 0, 0.3); }   // fixed mounts: straight ahead (+X), recoil only
     const fl = !!st.firing && !st.wrecked && Math.sin(S.t * 85) > -0.2; for (const f of flashes) { f.visible = fl; f.scale.setScalar(0.8 + 0.5 * Math.random()); }
-    tEye.visible = look.lights;
+    for (const t of tAll) t.eye.visible = look.lights;
+    applyLost(look);
     // thrusters + fire
     const thr = clamp((st.throttle || 0) * (st.speed < 60 ? 1 : 0.7), 0, 1) * (look.lights ? 1 : 0);
     for (const f of flames) { f.visible = thr > 0.15; f.scale.set(0.22 + thr * 0.45 + 0.1 * Math.random(), 0.55 + thr * 0.35, 0.55 + thr * 0.35); }
@@ -421,24 +535,29 @@ export function buildHeroCarPBR({ color = 0xc8501a, accent = 0x35e6ff, number = 
     uni.uWet.value += (clamp(st.wet ?? 0, 0, 1) - uni.uWet.value) * Math.min(1, dt * 1.2);
     uni.uDirt.value += (clamp(st.dirt ?? 0, 0, 1) - uni.uDirt.value) * Math.min(1, dt * 0.6);
     // LOD: far cars drop the fine parts
-    if (opts.shadow !== undefined && opts.shadow !== S.shadowOn) { S.shadowOn = opts.shadow; for (const o of [body, hood, kit, plates, tBase, tGun, innMetal, iTyre, iRim]) o.castShadow = opts.shadow; }
+    if (opts.shadow !== undefined && opts.shadow !== S.shadowOn) { S.shadowOn = opts.shadow; for (const o of [body, hood, kit, plates, ...tAll.flatMap((t) => [t.base, t.gun]), innMetal, iTyre, iRim, ...extras]) o.castShadow = opts.shadow; }
     const far = !!opts.far;
     for (const o of [cabin, disp, gaps, under]) if (look.lights || o !== under) o.visible = !far && (o !== disp || look.lights) && (o !== under || look.lights);
     decal.visible = look.lights && !far;
     return S.stage;
   }
 
-  const all = () => [innDark, innMetal, body, hood, glass, kit, flap, plates, cabin, disp, heads, tails, revs, under, gaps, tBase, tGun, tEye, iTyre, iRim, iDisc, iCal];
+  const all = () => [innDark, innMetal, body, hood, glass, kit, kitF, kitR, flap, plates, cabin, disp, heads, tails, revs, under, gaps, ...tAll.flatMap((t) => [t.base, t.gun, t.eye]), ...extras, iTyre, iRim, iDisc, iCal];
   const api = {
     update, S, mats, uniforms: uni, look: damageLook,
+    setLivery,
+    setPartLost(part, lost = true) { S.lost[part] = !!lost; },
+    get lostParts() { return Object.keys(S.lost).filter((k) => S.lost[k]); },
     get stage() { return S.stage; },
-    anchors: { exhaust: PBR_SPEC.exhaust, thrusters: PBR_SPEC.thrusters, engine: PBR_SPEC.engine, muzzle: PBR_SPEC.muzzle },
+    variant: carId, muzzle: carMuzzle(carId),
+    anchors: { exhaust: PBR_SPEC.exhaust, thrusters: V.thrusters, engine: PBR_SPEC.engine, muzzle: PBR_SPEC.muzzle },
     setEnvIntensity(v) { for (const m of Object.values(mats)) if (m.envMapIntensity !== undefined) m.envMapIntensity = (m.userData.baseEnv ??= m.envMapIntensity) * v; },
     setShadows(on) { root.traverse((o) => { if (o.isMesh && o.userData.cast !== false) o.castShadow = on && !['glass', 'interior', 'gaps', 'displays', 'underglow-decal'].includes(o.name); }); },
-    dispose() { const geos = new Set(); root.traverse((o) => { if (o.geometry) geos.add(o.geometry); }); geos.forEach((g) => g.dispose()); Object.values(mats).forEach((m) => m.dispose()); },
+    dispose() { for (const t of [bodyTex, roofTex, blank]) if (t) t.dispose(); const geos = new Set(); root.traverse((o) => { if (o.geometry) geos.add(o.geometry); }); geos.forEach((g) => g.dispose()); Object.values(mats).forEach((m) => m.dispose()); },
   };
   const triTotal = () => all().reduce((n, o) => n + triCount(o.geometry) * (o.isInstancedMesh ? 4 : 1), 0) + triCount(fire.children[0].geometry) * 3;
-  root.userData = { carId: 'hammer', hero: api, pbr: true, wheels: [], frontPivots: [], wheelRadius: WHEELS.radius, body, sprung, length: PBR_SPEC.length, width: PBR_SPEC.width, wrecked: false, drawCalls: all().length + 3, triCount: triTotal };
+  root.userData = { carId, variant: carId, hero: api, pbr: true, wheels: [], frontPivots: [], wheelRadius: WR, body, sprung, length: V.length, width: V.width, wrecked: false, drawCalls: all().length + 3, triCount: triTotal };
   body.userData.cast = hood.userData.cast = true;
+  if (livery) setLivery(livery);
   return root;
 }

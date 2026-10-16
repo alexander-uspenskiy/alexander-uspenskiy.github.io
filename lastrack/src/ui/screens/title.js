@@ -1,30 +1,57 @@
-import { h, button } from '../dom.js';
+// Title screen over the live 3D showroom: logo, Continue / New Game / Hero Slice / Settings.
+import { h, attachMenuKeys, fmtMoney } from '../dom.js';
+import { icon } from '../icons.js';
+import { getCar } from '../../data/cars.js';
+import { GAME_TRACKS } from '../../data/tracks/index.js';
+import { VERSION } from '../../version.js';
 
-export function createTitleScreen({ game, flow }) {
-  const cont = button('CONTINUE', () => flow.transition('garage'), 'btn-primary btn-continue');
-  const ng = button('NEW GAME', () => {
+/** Pure: one-line save summary for the Continue button. */
+export function saveSummary(save) {
+  if (!save) return '';
+  const car = getCar(save.carId);
+  const open = GAME_TRACKS.filter((t, i) => i === 0 || (save.unlockedTracks || []).includes(t.id)).length;
+  return `${fmtMoney(save.cash)} · ${car ? car.name : 'No car'} · ${open}/${GAME_TRACKS.length} tracks`;
+}
+
+function menuButton(label, sub, onClick, cls = '', key = '') {
+  const b = h('button.btn' + (cls ? '.' + cls.split(' ').join('.') : ''), { type: 'button', onclick: onClick },
+    h('span.lbl', label, sub ? h('span.sub', sub) : null), key ? h('span.k', key) : null, h('span.arrow', icon('play', { size: 16 })));
+  return b;
+}
+
+export function createTitleScreen({ game, flow, openSettings }) {
+  const cont = menuButton('CONTINUE', '', () => flow.transition('garage'), 'btn-primary btn-continue');
+  const ng = menuButton('NEW GAME', 'Pick a car, start with $5,000', () => {
     if (game.hasSavedGame() && !confirm('Start over? Your current save will be erased.')) return;
     game.newGame();
     flow.transition('carSelect');
   }, 'btn-new');
-  const slice = !!game.slice;
-  const heroBtn = button(slice ? 'START — HAMMER × SCRAPYARD' : 'HERO SLICE', () => {
-    if (slice) game.startSlice(); else location.search = '?slice=1';
-  }, slice ? 'btn-primary btn-hero' : 'btn-hero');
-  const fullBtn = button('FULL GAME', () => { location.search = ''; }, 'btn-full');
-  const el = h('section.screen.screen-title',
-    h('div.title-art', h('h1.logo', h('span', 'LAST'), h('span.alt', 'TRACK')),
-      h('p.tag', slice ? 'HERO SLICE — HAMMER · DETROIT SCRAPYARD' : 'RACE FOR MONEY. RACE FOR YOUR LIFE.')),
-    h('div.panel.menu', ...(slice ? [heroBtn, fullBtn] : [cont, ng, heroBtn])),
-    h('p.muted.small.keys', 'WASD/ARROWS drive · SPACE fire · E/TAB weapon · 1-4 select · SHIFT drift · C camera · P pause · M mute'));
+  const setBtn = menuButton('SETTINGS', 'Graphics · audio · controls', () => openSettings(), 'btn-settings');
+  const menu = h('nav.menu', { 'aria-label': 'Main menu' }, cont, ng, setBtn);
+  const keys = h('p.keys',
+    ...[['WASD', 'drive'], ['SPACE', 'fire'], ['E', 'weapon'], ['1-4', 'select'], ['SHIFT', 'drift'], ['C', 'camera'], ['P', 'pause'], ['M', 'mute']].map(([k, t]) => h('span', h('kbd', k), t)),
+    h('span', h('kbd', '↑↓←→'), 'menus'), h('span', h('kbd', 'GAMEPAD'), 'supported'));
+  const el = h('section.screen.screen-title.screen-3d',
+    h('div.title-main',
+      h('div.eyebrow', 'Vehicular combat league'),
+      h('h1.logo', { 'aria-label': 'Last Track' }, h('span', 'LAST'), h('span.alt', 'TRACK')),
+      h('p.tag', 'Race for money. Race for your life.'),
+      menu),
+    h('div.title-foot', keys, h('span.ver', `v${VERSION} · three.js`)));
+  let detach = null;
   return {
     el,
     show() {
-      if (slice) return;
+      detach = attachMenuKeys(el);
       const saved = game.hasSavedGame();
       cont.disabled = !saved;
       cont.classList.toggle('btn-primary', saved);
       ng.classList.toggle('btn-primary', !saved);
+      const lbl = cont.querySelector('.lbl');
+      lbl.querySelector('.sub')?.remove();
+      lbl.append(h('span.sub', saved ? saveSummary(game.getSave()) : 'No saved game yet'));
+      if (!saved) setTimeout(() => ng.focus({ preventScroll: true }), 80);
     },
+    hide() { detach?.(); detach = null; },
   };
 }

@@ -1,7 +1,7 @@
 // Track geometry from the Track API (§3.1): road ribbon, centre dashes, kerbs, walls, start line, ground. Node-safe.
 import * as THREE from 'three';
 import { MeshBuilder, disposeObject } from './geomUtil.js';
-import { COLOR as K } from './paletteRef.js';
+import { COLOR as K, MODERN_HEX, mixHex } from './paletteRef.js';
 
 const WALL_H = 1.1;
 const KERB_W = 1.2;
@@ -20,12 +20,13 @@ const P = (e, y = 0) => [e.x, y, e.y];
 export function buildTrackGeometry(track, { stride = 1 } = {}) {
   const def = track.def || {};
   const theme = def.theme || {};
-  const roadC = theme.road ?? K.black;
+  // asphalt: the theme's road colour lifted a little towards steel so it reads as tarmac rather than a black void
+  const roadC = mixHex(MODERN_HEX[(((theme.road ?? K.black) % 16) + 16) % 16], MODERN_HEX[K.darkGrey], 0.3);
   const curb = theme.curb || [K.red, K.white];
   const n = track.n;
-  const road = new MeshBuilder();
-  const kerbs = new MeshBuilder();
-  const walls = new MeshBuilder();
+  const road = new MeshBuilder({ ao: 0, jitter: 0.03 });
+  const kerbs = new MeshBuilder({ ao: 0, jitter: 0.04 });
+  const walls = new MeshBuilder({ ao: 0.34, aoSpan: 1.1, jitter: 0.04 });
   const step = Math.max(1, stride | 0);
   const ds = (track.ds || 2) * step;
   const dashEvery = Math.max(1, Math.round(6 / ds));
@@ -35,9 +36,7 @@ export function buildTrackGeometry(track, { stride = 1 } = {}) {
     const j = i + step;
     const [l0, r0] = edges(track, i);
     const [l1, r1] = edges(track, j);
-    // road: alternate two near shades by segment index for subtle banding
-    const shade = (seg >> 2) % 2 ? roadC : K.darkGrey === roadC ? K.black : roadC;
-    road.quad(P(r0), P(l0), P(l1), P(r1), shade);
+    road.quad(P(r0), P(l0), P(l1), P(r1), roadC);
     // centre dashes
     if (seg % dashEvery === 0) {
       const c0 = { x: (l0.x + r0.x) / 2, y: (l0.y + r0.y) / 2 };
@@ -91,7 +90,7 @@ export function buildTrackGeometry(track, { stride = 1 } = {}) {
     }
   }
   // ground: big quad under everything
-  const gb = new MeshBuilder();
+  const gb = new MeshBuilder({ ao: 0, jitter: 0 });
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
   for (let i = 0; i < n; i += 4) {
     const [l] = edges(track, i);
@@ -111,17 +110,18 @@ function mat(key, make) {
   return m;
 }
 
-/** buildTrackMesh(track) -> { group, bounds, dispose() }. 4 draw calls. */
+/** buildTrackMesh(track) -> { group, bounds, dispose() }. 4 draw calls (PBR vertex-colour materials; receives shadows). */
 export function buildTrackMesh(track, opts = {}) {
   const geos = buildTrackGeometry(track, opts);
   const group = new THREE.Group();
   group.name = 'track';
-  const lit = mat('lit', () => new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, side: THREE.DoubleSide }));
-  const flat = mat('flat', () => new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide }));
+  const lit = mat('lit', () => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.78, metalness: 0.06, side: THREE.DoubleSide }));
+  const flat = mat('flat', () => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0, side: THREE.DoubleSide }));
   const ground = new THREE.Mesh(geos.ground, flat); ground.name = 'ground';
-  const road = new THREE.Mesh(geos.road, lit); road.name = 'road';
+  const road = new THREE.Mesh(geos.road, mat('road', () => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.58, metalness: 0.1, side: THREE.DoubleSide }))); road.name = 'road';
   const kerbs = new THREE.Mesh(geos.kerbs, lit); kerbs.name = 'kerbs';
   const walls = new THREE.Mesh(geos.walls, lit); walls.name = 'walls';
+  for (const m of [ground, road, kerbs, walls]) m.receiveShadow = true;
   group.add(ground, road, kerbs, walls);
   return { group, bounds: geos.bounds, dispose: () => disposeObject(group) };
 }

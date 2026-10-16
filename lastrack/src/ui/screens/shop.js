@@ -1,6 +1,9 @@
 import { h, button, screenHeader, fmtMoney, attachMenuKeys, clear } from '../dom.js';
 import { WEAPONS } from '../../data/weapons.js';
 import { getCar } from '../../data/cars.js';
+import { weaponIcon } from '../icons.js';
+import { pct } from '../menuLogic.js';
+import { useStage } from '../stage.js';
 
 /** Pure: one-line spec shown under a weapon's name in the armory. */
 export function weaponSpec(w) {
@@ -14,11 +17,11 @@ export function weaponSpec(w) {
 }
 
 export function createShopScreen({ game, flow }) {
-  const cash = h('div.cash');
-  const slots = h('div.muted');
+  const cash = h('span.chip.cash');
+  const slots = h('span.chip');
   const list = h('div.shop-list');
   const msg = h('p.msg.muted');
-  let detach = null;
+  let detach = null, stageApi = null;
   const say = (t, bad = false) => { msg.textContent = t; msg.classList.toggle('bad', bad); };
 
   function render() {
@@ -32,21 +35,26 @@ export function createShopScreen({ game, flow }) {
       const own = save.weapons.find((x) => x.id === w.id);
       const passive = w.kind === 'passive';
       const act = own && passive
-        ? button('INSTALLED', () => {}, 'btn-ammo')
+        ? button('INSTALLED', () => {}, 'btn-ammo btn-small')
         : own
-        ? button(`AMMO +${w.ammoPack} ${fmtMoney(w.ammoPack * w.ammoPrice)}`, () => { const r = game.buy('ammo', w.id); say(r.ok ? `${w.name}: ammo loaded.` : r.error || 'Cannot buy ammo.', !r.ok); render(); }, 'btn-ammo')
-        : button(`BUY ${fmtMoney(w.price)}`, () => { const r = game.buy('weapon', w.id); say(r.ok ? `${w.name} mounted.` : r.error || 'Cannot buy.', !r.ok); render(); }, 'btn-primary btn-weapon');
+        ? button(`+${w.ammoPack} · ${fmtMoney(w.ammoPack * w.ammoPrice)}`, () => { const r = game.buy('ammo', w.id); say(r.ok ? `${w.name}: ammo loaded.` : r.error || 'Cannot buy ammo.', !r.ok); render(); }, 'btn-ammo btn-small')
+        : button(`BUY ${fmtMoney(w.price)}`, () => { const r = game.buy('weapon', w.id); say(r.ok ? `${w.name} mounted.` : r.error || 'Cannot buy.', !r.ok); render(); }, 'btn-primary btn-weapon btn-small');
       act.dataset.weapon = w.id;
       act.disabled = own && passive ? true : own ? (own.ammo >= w.maxAmmo || save.cash < w.ammoPack * w.ammoPrice) : save.cash < w.price;
+      const ammo = own && !passive ? h('div.ammo-meter', h('span', `AMMO ${own.ammo}/${w.maxAmmo}`), h('div.bar-track', h('div.bar-fill', { style: { width: pct(own.ammo, w.maxAmmo) + '%' } }))) : h('div.ammo-meter', h('span', passive ? (own ? 'ON' : 'PASSIVE') : `${fmtMoney(w.ammoPrice)}/rd · pack ${w.ammoPack}`));
       list.append(h('div.shop-row' + (own ? '.owned' : ''),
-        h('div.shop-name', h('b', w.name), h('small', weaponSpec(w)),
-        h('small.muted', passive ? `${fmtMoney(w.price)} · no ammo` : `${fmtMoney(w.price)} · ammo ${fmtMoney(w.ammoPrice)}/rd · pack ${w.ammoPack} · max ${w.maxAmmo}`)),
-        h('div.shop-ammo', own ? (passive ? 'ON' : `${own.ammo}/${w.maxAmmo}`) : '—'), act));
+        h('div.shop-icon', weaponIcon(w.id, { size: 32 })),
+        h('div.shop-name', h('b', w.name), h('small', weaponSpec(w))),
+        h('div.shop-foot', ammo, act)));
     }
   }
-  const el = h('section.screen.screen-shop',
-    screenHeader('ARMORY', 'Everything legal in the Last Track league. Which is everything.'),
-    h('div.panel.shop-main', h('div.row.between', slots, cash), list, msg),
-    h('footer.screen-foot', button('BACK', () => flow.transition('garage'), 'btn-back'), button('DRIVERS', () => flow.transition('roster'))));
-  return { el, show() { detach = attachMenuKeys(el); say(''); render(); }, hide() { detach?.(); } };
+  const el = h('section.screen.screen-shop.screen-3d',
+    screenHeader('ARMORY', 'Everything legal in the Last Track league. Which is everything.', [slots, cash]),
+    h('div.panel.shop-main', list, msg),
+    h('footer.screen-foot', button('BACK', () => flow.transition('garage'), 'btn-back'), h('span.spacer'), button('DRIVERS', () => flow.transition('roster'))));
+  return {
+    el,
+    show() { detach = attachMenuKeys(el); say(''); render(); stageApi = useStage(game, el, { side: -1, mode: 'garage' }); const s = game.getSave(); stageApi.show({ carId: s.carId, color: getCar(s.carId).color, upgrades: s.upgrades }); },
+    hide() { detach?.(); stageApi?.hide(); stageApi = null; },
+  };
 }

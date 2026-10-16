@@ -8,15 +8,15 @@ import { getTrack } from '../data/tracks/index.js';
 import { getDriver } from '../data/drivers.js';
 import { getWeapon } from '../data/weapons.js';
 import * as economy from '../data/economy.js';
-import { createRaceConfig } from '../data/raceConfig.js';
-import { createSliceConfig, SLICE_TRACK_ID } from '../data/sliceConfig.js';
-import { createSliceGarageScreen } from '../ui/screens/sliceGarage.js';
-import { createGarageScene } from '../render/pbr/garageScene.js';
+import { createGameConfig, SLICE_TRACK_ID } from '../data/sliceConfig.js';
+import { playerLivery } from '../data/liveries.js';
+import { createPaintScreen } from '../ui/screens/paint.js';
 import { createRaceSim } from '../sim/raceSim.js';
 import { createRenderHost } from '../render/renderHost.js';
 import { createRaceController } from '../render/raceController.js';
 import { createCarPreview } from '../render/carPreview.js';
 import { createMinimap } from '../render/minimap.js';
+import { createMenuScene } from '../render/menuScene.js';
 import { createAudioEngine } from '../audio/audioEngine.js';
 import { attachPBR } from '../render/pbr/pbrHost.js';
 import { readQuality, nextQuality } from '../render/pbr/quality.js';
@@ -35,6 +35,8 @@ import { createRaceSettingsScreen } from '../ui/screens/raceSettings.js';
 import { createLoadingScreen } from '../ui/screens/loading.js';
 import { createPauseScreen } from '../ui/screens/pause.js';
 import { createResultsScreen } from '../ui/screens/results.js';
+import { createSettingsSheet } from '../ui/screens/settingsSheet.js';
+import { loadSettings, saveSettings, normalizeSettings } from '../ui/settings.js';
 
 export const SIM_HZ = 120;
 const SIM_DT = 1 / SIM_HZ;
@@ -43,10 +45,11 @@ export const WRECK_SPECTATE = 20; // s the field keeps racing after the player i
 const FF_MAX_STEPS = SIM_HZ * 420;   // enough to run the rest of the field to the flag (a 3-lap race is ~3 min)
 const ERRORS = {
   'insufficient-cash': 'Not enough cash.', 'max-level': 'Already maxed.', 'already-owned': 'You already own that.',
-  'no-slots': 'No free weapon slots on this car.', 'ammo-full': 'Ammo is full.', 'not-owned': 'You do not own that weapon.',
-  'nothing-to-repair': 'Nothing to repair.',
+  'no-slots': 'No free weapon slots on this car.', 'ammo-full': 'Ammo is full.', 'not-owned': 'You do not own that.',
+  'nothing-to-repair': 'Nothing to repair.', 'decal-limit': 'Six decals per car — remove one first.',
 };
 const inRaceState = (s) => s === 'race' || s === 'paused';
+const MENU_3D = new Set(['title', 'carSelect', 'garage', 'shop', 'paint']);   // states drawn over the live 3D showroom
 
 /** Wrap an optional subsystem so that a bug in it never breaks the game. */
 function safe(obj, onError) {
@@ -64,7 +67,7 @@ function safe(obj, onError) {
   });
 }
 
-export function createGame({ root, canvas, storage, onError = () => {}, slice = false, sliceStyle = 'pbr', quality } = {}) {
+export function createGame({ root, canvas, storage, onError = () => {}, quality } = {}) {   // the photoreal PBR slice is the game; `?slice=1` is kept as a no-op alias
   storage = storage || getDefaultStorage();
   const bus = createEventBus();
   const store = createSaveStore(storage);
@@ -75,16 +78,21 @@ export function createGame({ root, canvas, storage, onError = () => {}, slice = 
   };
 
   let host = null;
-  try { host = createRenderHost(canvas, slice && sliceStyle === 'pbr' ? { palettePass: false } : {}); } catch (e) { reportError(e); }
-  let pbr = null;
-  if (host && slice && sliceStyle === 'pbr') { try { pbr = attachPBR(host, { quality: quality || readQuality(typeof location !== 'undefined' ? location.search : '', typeof localStorage !== 'undefined' ? localStorage : null), env: 'dusk' }); } catch (e) { reportError(e); } }
+  try { host = createRenderHost(canvas, { palettePass: false }); } catch (e) { reportError(e); }
+  let pbr = null, envKind = 'showroom';
+  if (host) { try { pbr = attachPBR(host, { quality: quality || readQuality(typeof location !== 'undefined' ? location.search : '', typeof localStorage !== 'undefined' ? localStorage : null), env: envKind }); } catch (e) { reportError(e); } }
+  const setEnv = (k) => { if (pbr && envKind !== k) { envKind = k; try { pbr.setEnv(k); } catch (e) { reportError(e); } } };
+  // player settings live in real localStorage even when the save is in-memory (?fresh=1 / slice)
+  const settingsStorage = getDefaultStorage();
+  let settings = loadSettings(settingsStorage);
+  if (pbr) settings = { ...settings, quality: pbr.qualityName };
+  let stage = null;
+  if (host && pbr) { try { stage = createMenuScene(host, { canvas }); } catch (e) { reportError(e); } }
   let audio = null;
   try { audio = safe(createAudioEngine(), reportError); } catch (e) { reportError(e); }
 
-  let garage = null;
   const flow = createFlowMachine({ initial: 'title' });
-  if (host && pbr && slice && sliceStyle === 'pbr') { try { garage = createGarageScene(host, { color: 9, canvas }); } catch (e) { reportError(e); } }
-  let raceSetup = { trackId: 'scrapyard', laps: 3, mode: 'race', practiceRivals: false };
+  let raceSetup = { trackId: SLICE_TRACK_ID, laps: 3, mode: 'race', practiceRivals: false };
   let sim = null, controller = null, track = null, config = null;
   let snapA = null, snapB = null, acc = 0, endTimer = 0, wreckTimer = 0, finalized = false;
   let lastResult = null;
@@ -101,8 +109,10 @@ export function createGame({ root, canvas, storage, onError = () => {}, slice = 
     get config() { return config; },
     get host() { return host; },
     get controller() { return controller; },
-    slice: !!slice, sliceStyle,
+    slice: true,
     get pbr() { return pbr; },
+    get stage() { return stage; },
+    get settings() { return settings; },
   };
 
   // ---------- save helpers ----------
@@ -111,7 +121,7 @@ export function createGame({ root, canvas, storage, onError = () => {}, slice = 
     getSave: () => saveData,
     setSave: (s) => commit(s),
     hasSavedGame: () => store.exists(),
-    newGame() { saveData = store.reset(); raceSetup = { ...raceSetup, trackId: 'scrapyard', laps: 3, mode: 'race' }; return saveData; },
+    newGame() { saveData = store.reset(); raceSetup = { ...raceSetup, trackId: SLICE_TRACK_ID, laps: 3, mode: 'race' }; return saveData; },
     chooseCar(carId) {
       const r = economy.chooseCar(saveData, carId);
       if (!r.ok) throw new Error('chooseCar: ' + r.error);
@@ -130,14 +140,16 @@ export function createGame({ root, canvas, storage, onError = () => {}, slice = 
       bus.emit('purchase', { kind, id });
       return { ok: true };
     },
-    /** Hero Slice: lock to the Hammer on Detroit Scrapyard with a fresh save, then go straight to the race. */
+    /** Quick start (debug / `?slice=1` alias): fresh save with the Hammer, straight into a race on the first track. */
     startSlice() {
       saveData = store.reset();
       const r = economy.chooseCar(saveData, 'hammer');
       if (r.ok) saveData = r.save;
-      raceSetup = sliceStyle === 'pbr' ? { trackId: SLICE_TRACK_ID, laps: 3, mode: 'race', practiceRivals: false } : { trackId: 'scrapyard', laps: 3, mode: 'race', practiceRivals: false };
+      raceSetup = { trackId: SLICE_TRACK_ID, laps: 3, mode: 'race', practiceRivals: false };
       return flow.force('loading');
     },
+    /** The player's resolved livery for a car (default: the saved car). Used by every 3D preview. */
+    liveryOf: (carId) => playerLivery(carId ? { ...saveData, carId } : saveData),
     getRaceSetup: () => raceSetup,
     setRaceSetup(p) { raceSetup = { ...raceSetup, ...p }; return raceSetup; },
     driverName: (r) => (r.isPlayer ? 'YOU (the rookie)' : getDriver(r.driverId)?.name ?? `Car ${r.carId}`),
@@ -145,6 +157,40 @@ export function createGame({ root, canvas, storage, onError = () => {}, slice = 
       try { return createCarPreview(c); } catch (e) { reportError(e); return null; }
     },
   });
+
+  // ---------- paint & decals (cosmetic save changes; every change is committed and pushed to the live 3D preview) ----------
+  const liveryCall = (fn) => (...a) => {
+    const r = fn(saveData, ...a);
+    if (!r.ok) return { ok: false, error: ERRORS[r.error] || r.error };
+    commit(r.save); stage?.setLivery?.(playerLivery(saveData));
+    bus.emit('livery:changed', playerLivery(saveData));
+    return { ok: true, cost: r.cost || 0 };
+  };
+  Object.assign(game, {
+    setPaint: liveryCall(economy.setPaint), setAccent: liveryCall(economy.setAccent), setNumber: liveryCall(economy.setNumber),
+    buyDecal: liveryCall(economy.purchaseDecal), placeDecal: liveryCall(economy.placeDecal), updateDecal: liveryCall(economy.updateDecal), removeDecal: liveryCall(economy.removeDecal),
+  });
+
+  // ---------- settings ----------
+  function applySettings(prev) {
+    document.body.classList.toggle('no-hints', !settings.hints);
+    if (audio) {
+      audio.setMuted(settings.muted); muted = settings.muted;
+      audio.setVolume(settings.master);
+      audio.setMusic(settings.music > 0.02);
+      audio.setMusicVolume?.(settings.music); audio.setSfxVolume?.(settings.sfx);
+    }
+    if (pbr && prev && prev.quality !== settings.quality) { pbr.setQuality(settings.quality); stage?.setQuality(settings.quality); }
+    if (controller && prev && prev.camera !== settings.camera) controller.setCamera(settings.camera);
+  }
+  game.updateSettings = (patch) => {
+    const prev = settings;
+    settings = normalizeSettings({ ...settings, ...patch });
+    saveSettings(settingsStorage, settings);
+    applySettings(prev);
+    bus.emit('settings:changed', settings);
+    return settings;
+  };
 
   // ---------- HUD / input / touch ----------
   const hud = createHud({ root, getWeapon });
@@ -159,23 +205,23 @@ export function createGame({ root, canvas, storage, onError = () => {}, slice = 
     const st = flow.state;
     if (a === 'pause') { if (st === 'race') game.pause(); else if (st === 'paused') game.resume(); }
     else if (a === 'camera') { if (st === 'race' && controller) { controller.cycleCamera(); } }
-    else if (a === 'quality') { if (pbr) { const n = pbr.setQuality(nextQuality(pbr.qualityName)); hud.toast('GRAPHICS: ' + n.toUpperCase(), 1200); } }
-    else if (a === 'mute') { muted = !muted; audio?.setMuted(muted); hud.toast(muted ? 'MUTED' : 'SOUND ON', 900); }
+    else if (a === 'quality') { if (pbr) { const n = pbr.setQuality(nextQuality(pbr.qualityName)); settings = { ...settings, quality: n }; saveSettings(settingsStorage, settings); stage?.setQuality(n); hud.toast('GRAPHICS: ' + n.toUpperCase(), 1200); } }
+    else if (a === 'mute') { muted = !muted; settings = { ...settings, muted }; saveSettings(settingsStorage, settings); audio?.setMuted(muted); hud.toast(muted ? 'MUTED' : 'SOUND ON', 900); }
   }
 
   // ---------- screens ----------
-  const ctx = { game, flow, bus };
+  const sheet = createSettingsSheet({ game });
+  root.append(sheet.el);
+  const ctx = { game, flow, bus, openSettings: () => sheet.open() };
   const screens = {
     title: createTitleScreen(ctx), carSelect: createCarSelectScreen(ctx), garage: createGarageScreen(ctx),
     shop: createShopScreen(ctx), roster: createRosterScreen(ctx), trackSelect: createTrackSelectScreen(ctx),
     raceSettings: createRaceSettingsScreen(ctx), loading: createLoadingScreen(ctx), paused: createPauseScreen(ctx),
-    results: createResultsScreen(ctx),
+    results: createResultsScreen(ctx), paint: createPaintScreen(ctx),
   };
-  if (slice && sliceStyle === 'pbr') screens.garage = createSliceGarageScreen(ctx);
   for (const s of Object.values(screens)) { s.el.classList.add('hidden'); root.append(s.el); }
   let shown = null;
   function showScreen(state, params) {
-    if (slice && (state === 'carSelect' || state === 'trackSelect' || state === 'raceSettings' || (state === 'garage' && sliceStyle !== 'pbr'))) { flow.force(sliceStyle === 'pbr' ? 'garage' : 'title'); return; } // slice: car and track are locked
     if (shown) { try { shown.hide?.(); } catch (e) { reportError(e); } shown.el.classList.add('hidden'); shown = null; }
     const s = screens[state];
     if (!s) return;
@@ -200,20 +246,18 @@ export function createGame({ root, canvas, storage, onError = () => {}, slice = 
     track = buildTrack(def);
     const practice = setup.mode === 'practice';
     const seed = (Date.now() ^ ((saveData.races + 1) * 2654435761)) >>> 0;
-    config = slice && sliceStyle === 'pbr' && def.id === SLICE_TRACK_ID ? createSliceConfig({ save: saveData, seed, laps: setup.laps }) : createRaceConfig({
-      mode: setup.mode, trackId: def.id, laps: setup.laps, save: saveData, seed,
-      rivalIds: practice && !setup.practiceRivals ? [] : undefined,
-    });
-    if (slice) { config.hero = true; config.heroStyle = sliceStyle; }
+    config = createGameConfig({ mode: setup.mode, trackId: def.id, laps: setup.laps, save: saveData, seed, practiceRivals: !!setup.practiceRivals });
+    void practice;
     sim = createRaceSim(config);
     snapA = snapB = sim.snapshot();
     acc = 0; endTimer = 0; wreckTimer = 0; finalized = false; lastResult = null;
     if (host) {
       controller = createRaceController(host, track, config);
+      if (settings.camera && settings.camera !== 'chase') controller.setCamera(settings.camera);
       try { host.resize(canvas.clientWidth || window.innerWidth, canvas.clientHeight || window.innerHeight); } catch (e) { reportError(e); }
     }
     const names = snapA.cars.map((c) => c.name);
-    hud.begin({ createMinimap, track, names, hero: !!config.hero });
+    hud.begin({ createMinimap, track, names, hero: !!config.hero, carId: (config.player && config.player.carId) || saveData.carId });
     audio?.resume();
     audio?.startRace();
     bus.emit('race:created', { config });
@@ -266,13 +310,17 @@ export function createGame({ root, canvas, storage, onError = () => {}, slice = 
           try { startRace(); flow.transition('race'); } catch (e) { reportError(e); flow.transition('garage'); }
         }));
       }
-      if (garage) { if (to === 'garage') { garage.show(); pbr?.setEnv('showroom'); } else if (from === 'garage') { garage.hide(); if (to === 'loading') pbr?.setEnv('dusk'); } }
+      const menu3d = !!stage && MENU_3D.has(to);
+      if (stage) { if (menu3d) { setEnv('showroom'); stage.show(); } else stage.hide(); }
+      if (to === 'loading' || inRaceState(to)) setEnv('dusk');
       if (to === 'title') document.body.classList.remove('racing');
       document.body.classList.toggle('racing', inRaceState(to));
+      document.body.classList.toggle('scene3d', menu3d);
       showScreen(to, params);
     } catch (e) { reportError(e); }
   });
-  if (slice && sliceStyle === 'pbr') flow.force('garage'); else showScreen('title', {});
+  applySettings(null);
+  { if (stage) { stage.setCar({ carId: 'hammer', color: 9 }); stage.setMode('title', { side: 1 }); stage.show(); document.body.classList.add('scene3d'); } showScreen('title', {}); }
   audio?.setScene('menu'); // plays once the first user gesture creates the AudioContext
 
   // ---------- main loop ----------
@@ -282,9 +330,12 @@ export function createGame({ root, canvas, storage, onError = () => {}, slice = 
     lastT = t;
     const st = flow.state;
     if (st === 'race' && sim) {
-      const { steps, acc: a } = advanceAccumulator(acc, dt, SIM_HZ);
+      // hit-stop / slow-mo on wrecks and big hits: the controller scales the real frame time the sim is fed (sim stays deterministic)
+      const ts = controller && controller.stepTime ? controller.stepTime(dt) : 1;
+      const { steps, acc: a } = advanceAccumulator(acc, dt * ts, SIM_HZ);
       acc = a;
       const inp = input.read();
+      inp.nitro = inp.nitro || input.pressed.has('KeyF') || input.pressed.has('KeyX');   // nitro: F / X (Shift stays the handbrake)
       let events = [];
       for (let i = 0; i < steps; i++) {
         sim.step(inp);
@@ -294,6 +345,7 @@ export function createGame({ root, canvas, storage, onError = () => {}, slice = 
         inp.cycleWeapon = false; inp.selectWeapon = null; // edges apply to the first step only
       }
       if (steps > 0 && events.length !== (snapB.events?.length ?? 0)) snapB = { ...snapB, events };
+      else if (steps === 0 && snapB?.events?.length) snapB = { ...snapB, events: [] };   // slow-mo / hit-stop frames: do not replay the last tick's events (HUD feed)
       const me = snapB.cars[0];
       if (controller) { controller.update(snapA, snapB, acc, dt); host.render(); }
       hud.update(snapB);
@@ -306,8 +358,8 @@ export function createGame({ root, canvas, storage, onError = () => {}, slice = 
         hud.setNote?.(`SPECTATING — RESULTS IN ${Math.max(0, Math.ceil(WRECK_SPECTATE - wreckTimer))}`);
         if (wreckTimer >= WRECK_SPECTATE) finishRace();
       } else hud.setNote?.('');
-    } else if (st === 'garage' && garage) {
-      try { garage.update(dt); host.render(); } catch (e) { reportError(e); }
+    } else if (stage && stage.shown && MENU_3D.has(st)) {
+      try { stage.update(dt); host.render(); } catch (e) { reportError(e); }
     } else if (st === 'paused' && controller) {
       try { controller.update(snapB, snapB, 0, 0); host.render(); } catch (e) { reportError(e); }
     }
@@ -330,6 +382,10 @@ export function createGame({ root, canvas, storage, onError = () => {}, slice = 
   const listen = (tg, ev, fn, o) => { tg.addEventListener(ev, fn, o); cleanups.push(() => tg.removeEventListener(ev, fn, o)); };
   listen(window, 'resize', () => { try { host?.resize(canvas.clientWidth || window.innerWidth, canvas.clientHeight || window.innerHeight); } catch (e) { reportError(e); } });
   listen(document, 'visibilitychange', () => { if (document.hidden) pause(); });
+  listen(window, 'pointermove', (e) => {
+    const x = (e.clientX / (window.innerWidth || 1)) * 2 - 1, y = (e.clientY / (window.innerHeight || 1)) * 2 - 1, st = document.documentElement.style;
+    st.setProperty('--px', x.toFixed(3)); st.setProperty('--py', y.toFixed(3));
+  });
   const unlock = () => audio?.resume();
   listen(window, 'pointerdown', unlock, { once: true });
   listen(window, 'keydown', unlock, { once: true });
@@ -346,7 +402,7 @@ export function createGame({ root, canvas, storage, onError = () => {}, slice = 
       cancelAnimationFrame(rafId);
       cleanups.forEach((c) => c());
       input.dispose(); touch.dispose();
-      disposeRace(); hud.dispose();
+      disposeRace(); hud.dispose(); sheet.dispose(); try { stage?.dispose(); } catch { /* ignore */ }
       audio?.dispose();
       try { host?.dispose(); } catch { /* ignore */ }
     },

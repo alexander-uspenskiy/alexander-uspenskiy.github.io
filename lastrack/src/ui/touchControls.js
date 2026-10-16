@@ -1,5 +1,6 @@
 // On-screen controls for touch devices: steer pad + gas/brake + fire/cycle/handbrake/camera.
 import { h } from './dom.js';
+import { icon } from './icons.js';
 
 /** Pure: hold state -> PlayerInput fields. */
 export function holdsToInput(hold) {
@@ -18,8 +19,11 @@ export function createTouchControls({ root, onAction = () => {}, onCycle = () =>
   const hold = { left: false, right: false, gas: false, brake: false, fire: false, hand: false };
   const active = new Map();
 
-  function holdButton(key, cls, label) {
-    const btn = h('button.tc-btn.' + cls, { type: 'button', 'aria-label': label, tabindex: -1 }, h('span', label));
+  // Visual only: round glass buttons (hud.css .tc*). Each button = glyph + caption; the aria-label keeps the spoken name.
+  const face = (glyph, label, text) => [glyph ? icon(glyph, { size: 22, cls: 'tc-ico' }) : null, text === null ? null : h('span.tc-cap', text ?? label)];
+
+  function holdButton(key, cls, label, glyph, text) {
+    const btn = h('button.tc-btn.' + cls, { type: 'button', 'aria-label': label, tabindex: -1 }, face(glyph, label, text));
     const down = (e) => {
       e.preventDefault();
       if (active.has(e.pointerId)) return;
@@ -41,8 +45,8 @@ export function createTouchControls({ root, onAction = () => {}, onCycle = () =>
     btn.addEventListener('contextmenu', (e) => e.preventDefault());
     return btn;
   }
-  function tapButton(cls, label, fn) {
-    const btn = h('button.tc-btn.' + cls, { type: 'button', 'aria-label': label, tabindex: -1 }, h('span', label));
+  function tapButton(cls, label, fn, glyph) {
+    const btn = h('button.tc-btn.' + cls, { type: 'button', 'aria-label': label, tabindex: -1 }, face(glyph, label));
     btn.addEventListener('pointerdown', (e) => { e.preventDefault(); btn.classList.add('down'); fn(); });
     const clr = () => btn.classList.remove('down');
     btn.addEventListener('pointerup', clr);
@@ -53,10 +57,10 @@ export function createTouchControls({ root, onAction = () => {}, onCycle = () =>
   }
 
   const el = h('div.tc.hidden',
-    h('div.tc-steer', holdButton('left', 'tc-left', '◀'), holdButton('right', 'tc-right', '▶')),
+    h('div.tc-steer', holdButton('left', 'tc-left', 'LEFT', 'back', null), holdButton('right', 'tc-right', 'RIGHT', 'forward', null)),
     h('div.tc-rgroup',
-      h('div.tc-aux', holdButton('hand', 'tc-hand', 'DRIFT'), tapButton('tc-cycle', 'WPN', () => onCycle()), tapButton('tc-cam', 'CAM', () => onAction('camera'))),
-      h('div.tc-pedals', holdButton('brake', 'tc-brake', 'BRAKE'), holdButton('fire', 'tc-fire', 'FIRE'), holdButton('gas', 'tc-gas', 'GAS'))));
+      h('div.tc-aux', holdButton('hand', 'tc-hand', 'DRIFT', 'car'), tapButton('tc-cycle', 'WPN', () => onCycle(), 'target'), tapButton('tc-cam', 'CAM', () => onAction('camera'), 'camera')),
+      h('div.tc-pedals', holdButton('brake', 'tc-brake', 'BRAKE', 'pause'), holdButton('fire', 'tc-fire', 'FIRE', 'skull'), holdButton('gas', 'tc-gas', 'GAS', 'bolt'))));
   el.addEventListener('touchstart', (e) => { if (e.cancelable) e.preventDefault(); }, { passive: false });
   root.append(el);
 

@@ -1,6 +1,8 @@
 // One per race: builds track/scenery/sky/lights, owns car meshes + effects + camera rig, consumes interpolated Snapshots (§5).
 import * as THREE from 'three';
-import { buildCarMesh } from './carModel.js';
+import { buildCarMesh, applyLostParts } from './carModel.js';
+import { eventImpact, TimeScaler } from './impactFx.js';
+import { PART_IDS } from '../sim/parts.js';
 import { buildHeroCar } from './heroCar.js';
 import { buildHeroTrack } from './heroTrack.js';
 import { buildHeroCarPBR } from './pbr/heroCarPBR.js';
@@ -15,21 +17,43 @@ import { colorRGB, wrapAngle, angleDiff, disposeObject } from './geomUtil.js';
 import { COLOR as K, PALETTE } from './paletteRef.js';
 import { getDriver } from '../data/drivers.js';
 
-/** Gradient sky dome (vertex colours): horizon colour -> zenith colour. Node-safe. */
+const lerp = (a, b, t) => a + (b - a) * t;
+const smooth01 = (e0, e1, x) => { const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t); };
+/** World-space direction of the sun (also the sky glow centre and the shadow-key direction). */
+export const SUN_DIR = (() => { const v = [-0.46, 0.55, 0.36], l = Math.hypot(...v); return v.map((x) => x / l); })();
+
+/**
+ * Smooth gradient sky dome (vertex colours, no banding): deep zenith -> theme sky -> warm horizon haze, with a soft sun glow.
+ * Node-safe. Returns the mesh; mesh.userData.haze = [r,g,b] (linear) is the colour fog should match.
+ */
 export function buildSky(theme = {}) {
   const [hor, top] = theme.sky || [K.sky, K.navy];
-  const geo = new THREE.SphereGeometry(1800, 16, 8);
+  const R = 1800;
+  const geo = new THREE.SphereGeometry(R, 48, 28);
   const pos = geo.attributes.position, col = new Float32Array(pos.count * 3);
-  const a = colorRGB(hor), b = colorRGB(top);
+  const h = colorRGB(hor), z = colorRGB(top), dark = colorRGB(K.black);
+  const zenith = [0, 1, 2].map((k) => lerp(z[k], dark[k], 0.42));
+  const hl = 0.2126 * h[0] + 0.7152 * h[1] + 0.0722 * h[2];
+  const lift = 0.12 + 0.4 * smooth01(0.02, 0.35, hl);   // bright horizons get a milky haze, night themes stay dark
+  const haze = [0, 1, 2].map((k) => lerp(h[k], 1, lift) * (k === 0 ? 1.08 : k === 2 ? 0.92 : 1));   // slightly warm horizon haze
+  const sunC = [1.0, 0.72, 0.42];
   for (let i = 0; i < pos.count; i++) {
-    const t = Math.min(1, Math.max(0, pos.getY(i) / 1800));
-    const q = Math.floor(t * 4) / 4; // banded gradient: reads as 16-colour art
-    for (let k = 0; k < 3; k++) col[i * 3 + k] = a[k] + (b[k] - a[k]) * q;
+    const x = pos.getX(i) / R, y = pos.getY(i) / R, zz = pos.getZ(i) / R;
+    const e = Math.max(0, y);
+    const tMid = smooth01(0, 0.34, e), tTop = smooth01(0.1, 0.9, e);
+    const c = [0, 1, 2].map((k) => lerp(lerp(haze[k], h[k], tMid), zenith[k], tTop));
+    // below the horizon: fade into the haze (hidden by the ground, but keeps the rim clean)
+    const below = y < 0 ? smooth01(0, -0.25, y) : 0;
+    const cs = x * SUN_DIR[0] + y * SUN_DIR[1] + zz * SUN_DIR[2], ang = Math.acos(Math.min(1, Math.max(-1, cs)));
+    const glow = Math.exp(-ang * ang * 7) * 0.55 + Math.exp(-ang * ang * 420) * 1.4;
+    const horizonBand = Math.exp(-e * 9) * Math.max(0, cs) * 0.35;   // warm bloom of the horizon towards the sun
+    for (let k = 0; k < 3; k++) col[i * 3 + k] = lerp(c[k], haze[k] * 0.8, below) + sunC[k] * (glow + horizonBand);
   }
   geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
-  const mat = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false, depthWrite: false });
+  const mat = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false, depthWrite: false, toneMapped: false });
   const mesh = new THREE.Mesh(geo, mat);
   mesh.renderOrder = -10; mesh.frustumCulled = false; mesh.name = 'sky';
+  mesh.userData.haze = haze;
   return mesh;
 }
 
@@ -46,64 +70,111 @@ export function createRaceController(host, track, config = {}) {
   const heroSky = !pbrMode && config.hero && track.id === 'scrapyard';
   const sky = heroSky || pbrMode ? new THREE.Group() : buildSky(theme); root.add(sky);
   const heroTrack = !pbrMode && config.hero && track.id === 'scrapyard' ? buildHeroTrack(track, { seed: config.seed }) : null;
-  const pbrTrack = pbrMode && track.id === 'neonloop' ? buildPbrTrack(track, { seed: 77 }) : null;
+  const look = (track.def && track.def.look) || {};
+  const pbrTrack = pbrMode && (track.def && (track.def.surfaces || track.id === 'neonloop')) && ['neonloop', 'foundry'].includes(track.id) ? buildPbrTrack(track, { seed: look.seed || 77 }) : null;
   const trackMesh = pbrTrack || heroTrack || buildTrackMesh(track); root.add(trackMesh.group);
   const scenery = heroTrack || pbrTrack ? { group: new THREE.Group(), dispose() {} } : buildScenery(track, { seed: config.seed }); root.add(scenery.group);
-  let hemi, sun, keyLight = null;
+  let hemi, sun, keyLight = null, shadowsOn = false;
   const fogC = new THREE.Color(...colorRGB(heroTrack ? heroTrack.fogColor : theme.sky ? theme.sky[0] : K.sky));
   const prevFog = scene.fog, prevBg = scene.background;
   if (pbrMode) {
     // IBL (scene.environment, set by attachPBR) does the ambient; one shadow-casting key light follows the player; haze instead of palette fog
     hemi = new THREE.HemisphereLight(0x8a6a8a, 0x1a1418, 0.25);
-    keyLight = makeKeyLight(host.pbr ? host.pbr.quality : { shadowMap: 1024, shadowSoft: false }, { intensity: pbrTrack ? 1.5 : 3.4, area: 22, color: pbrTrack ? 0xffa27a : 0xffb98a });
-    if (pbrTrack) { scene.backgroundIntensity = 0.4; scene.environmentIntensity = 0.5 * (host.pbr ? host.pbr.quality.reflections : 1); }
+    keyLight = makeKeyLight(host.pbr ? host.pbr.quality : { shadowMap: 1024, shadowSoft: false }, { intensity: pbrTrack ? (look.keyIntensity ?? 1.5) : 3.4, area: 22, color: pbrTrack ? (look.key ?? 0xffa27a) : 0xffb98a });
+    if (pbrTrack) { scene.backgroundIntensity = look.bgIntensity ?? 0.4; scene.environmentIntensity = 0.5 * (host.pbr ? host.pbr.quality.reflections : 1); }
     root.add(hemi, keyLight, keyLight.target); sun = keyLight;
-    scene.fog = new THREE.FogExp2(pbrTrack ? 0x3a2640 : 0x5a3446, pbrTrack ? 0.0052 : 0.0042);
+    scene.fog = new THREE.FogExp2(pbrTrack ? (look.fog ?? 0x3a2640) : 0x5a3446, pbrTrack ? (look.fogDensity ?? 0.0052) : 0.0042);
     if (!pbrTrack) trackMesh.group.traverse((o) => { if (o.isMesh) o.receiveShadow = true; });
-  } else {
-    hemi = new THREE.HemisphereLight(heroTrack ? PALETTE[K.pink] : PALETTE[theme.sky ? theme.sky[0] : 12], heroTrack ? PALETTE[K.plum] : PALETTE[theme.ground ?? 5], heroTrack ? 1.9 : 1.6);
-    sun = new THREE.DirectionalLight(heroTrack ? 0xffb070 : 0xffffff, heroTrack ? 2.1 : 2.0); sun.position.set(-40, 100, 30);
-    if (heroTrack) sun.position.set(-90, 38, 40);   // low dusk sun
+  } else if (heroTrack) {
+    // retro hero art (?style=retro): original dusk lighting
+    hemi = new THREE.HemisphereLight(PALETTE[K.pink], PALETTE[K.plum], 1.9);
+    sun = new THREE.DirectionalLight(0xffb070, 2.1); sun.position.set(-90, 38, 40);   // low dusk sun
     root.add(hemi, sun);
-    scene.fog = heroTrack ? new THREE.Fog(fogC, 80, 430) : new THREE.Fog(fogC, 160, 700);
+    scene.fog = new THREE.Fog(fogC, 80, 430);
     scene.background = fogC;
+  } else {
+    // modern full-colour look: smooth sky, exponential haze fog tinted from the sky, warm sun + cool fill + hemisphere ambient.
+    // With host.pbr (attachPBR: ACES, IBL, shadow maps, bloom) the sun also casts soft shadows from the cars and follows the player.
+    const hz = sky.userData.haze || colorRGB(theme.sky ? theme.sky[0] : K.sky);
+    fogC.setRGB(Math.min(1, hz[0]), Math.min(1, hz[1]), Math.min(1, hz[2]));
+    const lin = (idx) => new THREE.Color(...colorRGB(idx));
+    hemi = new THREE.HemisphereLight(lin(theme.sky ? theme.sky[0] : K.sky).lerp(new THREE.Color(1, 1, 1), 0.25), lin(theme.ground ?? K.darkGrey).multiplyScalar(0.75), host.pbr ? 1.15 : 1.5);
+    sun = new THREE.DirectionalLight(0xffe9cc, host.pbr ? 2.8 : 2.4);
+    const fill = new THREE.DirectionalLight(0x6f8cff, host.pbr ? 0.55 : 0.45); fill.position.set(60, 30, -50);
+    shadowsOn = !!(host.pbr && host.renderer && host.renderer.shadowMap && host.renderer.shadowMap.enabled);
+    if (shadowsOn) {
+      keyLight = makeKeyLight(host.pbr.quality, { intensity: 2.8, area: 24, color: 0xffe9cc });
+      keyLight.userData.dir.set(SUN_DIR[0], SUN_DIR[1], SUN_DIR[2]);
+      keyLight.shadow.camera.far = 140; keyLight.shadow.camera.updateProjectionMatrix();
+      keyLight.position.copy(keyLight.userData.dir).multiplyScalar(60);
+      sun = keyLight; root.add(keyLight.target);
+    } else sun.position.set(SUN_DIR[0] * 100, SUN_DIR[1] * 100, SUN_DIR[2] * 100);
+    root.add(hemi, sun, fill);
+    scene.fog = new THREE.FogExp2(fogC, 0.0024);
+    scene.background = fogC;
+    if (host.pbr) scene.environmentIntensity = 0.55 * host.pbr.quality.reflections;   // sky-ish IBL: reflections on paint without washing out the vertex colours
   }
-  const effects = createEffects(root, { soft: pbrMode });
+  const effects = createEffects(root, { soft: pbrMode || (!heroTrack && !!host.pbr) });
   const rig = new CameraRig(host.camera);
   const carsGroup = new THREE.Group(); root.add(carsGroup);
   const blobGeo = new THREE.CircleGeometry(1, 10); blobGeo.rotateX(-Math.PI / 2);
   const blobMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.35, depthWrite: false });
   const entries = []; // index = car id
   let last = null;
-  let lastQ = '', lastTime = -1, clock = 0, wreckClock = 0, spectating = false;
+  let lastQ = '', lastTime = -1, clock = 0, wreckClock = 0, spectating = false, lastEvTick = -1;
+  const timeScaler = new TimeScaler(), impact = { shake: 0, hitStop: 0, slowScale: 1, slowDur: 0 };
   const poses = [];
   const getPose = (id) => poses[id];
 
   function carIdFor(c) {
-    if (config.hero && config.heroStyle === 'pbr' && config.slice) return 'hammer';   // slice field is all Hammers
     if (c.isPlayer) return (config.player && config.player.carId) || 'wasp';
     const r = (config.rivals || []).find((x) => x.driverId === c.driverId);
     const d = getDriver(c.driverId || (r && r.driverId));
     return (d && d.carId) || (r && r.carId) || ['hammer', 'bulwark', 'wasp'][c.id % 3];
   }
+  const castShadows = (m) => { if (shadowsOn) m.traverse((o) => { if (o.isMesh) o.castShadow = o.name !== 'lights'; }); return m; };
   function ensureCar(c) {
     let e = entries[c.id];
     if (!e) {
       const carId = carIdFor(c);
-      const hero = config.hero && carId === 'hammer';
-      const pbrCar = hero && pbrMode;
-      e = { id: c.id, carId, hero, wet: 0.25, dirt: 0, wrecked: !!c.wrecked, mesh: pbrCar ? buildHeroCarPBR({ color: PBR_PALETTE(c.color), accent: c.isPlayer ? 0x35e6ff : PBR_PALETTE.accent(c.color) }) : hero ? buildHeroCar({ color: c.color, helmetColor: c.helmetColor, number: String((c.id * 7 + 9) % 100) }) : buildCarMesh({ carId, color: c.color, helmetColor: c.helmetColor, wrecked: c.wrecked }), blob: new THREE.Mesh(blobGeo, blobMat) };
+      const pbrCar = pbrMode;
+      const hero = pbrCar || (config.hero && carId === 'hammer');
+      e = { id: c.id, carId, hero, wet: 0.25, dirt: 0, wrecked: !!c.wrecked, lost: [], mesh: pbrCar ? buildHeroCarPBR({ carId, color: PBR_PALETTE(c.color), accent: c.isPlayer ? 0x35e6ff : PBR_PALETTE.accent(c.color), livery: c.livery || null }) : hero ? buildHeroCar({ color: c.color, helmetColor: c.helmetColor, number: String((c.id * 7 + 9) % 100) }) : buildCarMesh({ carId, color: c.color, helmetColor: c.helmetColor, wrecked: c.wrecked }), blob: new THREE.Mesh(blobGeo, blobMat) };
       if (pbrCar) { e.blob.visible = false; e.mesh.traverse((o) => { if (o.isMesh) o.frustumCulled = o.isInstancedMesh ? false : o.frustumCulled; }); }
+      if (!pbrCar && !hero) castShadows(e.mesh);
       carsGroup.add(e.mesh, e.blob);
       entries[c.id] = e;
+      effects.carIds[c.id] = carId;
     }
     if (!!c.wrecked !== e.wrecked && !e.hero) {
       carsGroup.remove(e.mesh); disposeObject(e.mesh);
       e.wrecked = !!c.wrecked;
-      e.mesh = buildCarMesh({ carId: e.carId, color: c.color, helmetColor: c.helmetColor, wrecked: e.wrecked });
+      e.mesh = castShadows(buildCarMesh({ carId: e.carId, color: c.color, helmetColor: c.helmetColor, wrecked: e.wrecked, lost: e.wrecked ? PART_IDS : e.lost }));
       carsGroup.add(e.mesh);
     }
     return e;
+  }
+
+  // progressive damage: a part the sim tore off disappears from the car (the flying piece is spawned by effects.js)
+  function loseCarPart(carId, part, c) {
+    const e = entries[carId];
+    if (!e || e.lost.includes(part)) return;
+    e.lost.push(part);
+    const hero = e.mesh.userData.hero;
+    if (hero && hero.setPartLost) { hero.setPartLost(part, true); if (part === 'doorL' || part === 'doorR') { hero.setPartLost('doorL', true); hero.setPartLost('doorR', true); } }
+    else if (!hero && !e.wrecked) applyLostParts(e.mesh, { color: c.color, helmetColor: c.helmetColor, lost: e.lost });
+  }
+  /** Once per sim tick: part loss + camera feel (shake / hit-stop / slow-mo) from the events of that tick. */
+  function feel(B, follow) {
+    if (B.tick === lastEvTick) return;
+    lastEvTick = B.tick;
+    const me = follow ? { id: follow.id, x: follow.x, y: follow.y } : null;
+    for (const ev of B.events || []) {
+      if (ev.type === 'partLost') loseCarPart(ev.carId, ev.part, B.cars[ev.carId] || {});
+      eventImpact(ev, me, impact);
+      if (impact.shake > 0) rig.addShake(impact.shake);
+      if (impact.hitStop > 0 || impact.slowDur > 0) timeScaler.trigger(impact.hitStop, impact.slowScale, impact.slowDur);
+    }
   }
 
   function update(snapA, snapB, alpha = 1, dt = 1 / 60) {
@@ -120,7 +191,10 @@ export function createRaceController(host, track, config = {}) {
       poses[cb.id] = p;
       e.mesh.position.set(p.x, 0, p.y); e.mesh.rotation.y = -p.heading;
       e.blob.position.set(p.x, 0.07, p.y); e.blob.rotation.y = -p.heading;
+      if (shadowsOn && !e.hero) e.blob.visible = Math.hypot(p.x - host.camera.position.x, p.y - host.camera.position.z) > 36;   // real shadow near the camera, blob for distant cars
       e.blob.scale.set(e.mesh.userData.length * 0.55, 1, e.mesh.userData.width * 0.6);
+      const gone = cb.wrecked && cb.wreckT !== undefined && cb.wreckT <= 0;   // the wreck timed out in the sim: the hull is removed (scorch marks stay)
+      e.mesh.visible = !gone; if (gone) e.blob.visible = false;
       const ud = e.mesh.userData;
       if (ud.hero) {
         // turret aim: nearest live rival ahead within 70 m and ±100°, otherwise a slow scan
@@ -169,10 +243,7 @@ export function createRaceController(host, track, config = {}) {
     const pp = follow && poses[follow.id];
     if (pp) {
       if (spectating) pp.wrecked = false;
-      for (const ev of B.events || []) {
-        if (ev.type === 'bump' && ev.carId === follow.id) rig.addShake(Math.min(0.9, (ev.strength || 1) * 0.08));
-        else if (ev.type === 'explosion') { const d = Math.hypot(ev.x - follow.x, ev.y - follow.y); if (d < 40) rig.addShake((1 - d / 40) * 0.7); }
-      }
+      feel(B, follow);
       rig.update(dt, pp, B.phase, B.countdown);
     }
     if (pbrMode) {                                                    // lift the scene so the car clears the dashboard
@@ -183,7 +254,7 @@ export function createRaceController(host, track, config = {}) {
     if (pbrTrack && pp) { if (host.pbr && host.pbr.qualityName !== lastQ) { lastQ = host.pbr.qualityName; pbrTrack.setQuality(host.pbr.quality); } pbrTrack.update(dt, host.camera, { x: pp.x, z: pp.y }); }
     if (keyLight && pp) followShadow(keyLight, pp.x, 0, pp.y);
     if (heroTrack) heroTrack.update(dt, host.camera, (host.renderer && host.renderer.domElement ? host.renderer.domElement.height : 600) / (host.palettePassActive ? (host.pixelScale || 2) : 1));
-    effects.update(B, dt, getPose, (host.renderer && host.renderer.domElement ? host.renderer.domElement.height : 600) * 0.45 / (host.palettePassActive ? (host.pixelScale || 2) : 1));
+    effects.update(B, dt * timeScaler.scale, getPose, (host.renderer && host.renderer.domElement ? host.renderer.domElement.height : 600) * 0.45 / (host.palettePassActive ? (host.pixelScale || 2) : 1));
   }
 
   return {
@@ -192,19 +263,23 @@ export function createRaceController(host, track, config = {}) {
     cycleCamera() { rig.setMode(nextCameraMode(rig.mode)); return rig.mode; },
     get cameraMode() { return rig.mode; },
     get spectating() { return spectating; },
+    /** Real-time multiplier for the sim's frame time: hit-stop / slow-mo on wrecks and big hits (1 when idle). Call update(dt) once per frame first. */
+    get timeScale() { return timeScaler.scale; },
+    stepTime(dt) { return timeScaler.update(dt); },
     hero: !!config.hero,
     heroTrack,
     CAMERA_MODES,
     minimapState() {
-      return { snapshot: last, bounds: trackMesh.bounds, cars: last ? last.cars.map((c) => ({ x: c.x, y: c.y, isPlayer: c.isPlayer, color: c.color, wrecked: c.wrecked })) : [] };
+      return { snapshot: last, bounds: trackMesh.bounds, cars: last ? last.cars.map((c) => ({ x: c.x, y: c.y, isPlayer: c.isPlayer, color: c.color, livery: c.livery, wrecked: c.wrecked })) : [] };
     },
     effects, rig,
     dispose() {
       scene.remove(root);
       if (pbrMode) host.camera.clearViewOffset();
       if (pbrTrack) { pbrTrack.dispose(); scene.backgroundIntensity = 1; scene.environmentIntensity = host.pbr ? host.pbr.quality.reflections : 1; }
+      if (!pbrMode && !heroTrack && host.pbr) scene.environmentIntensity = host.pbr.quality.reflections;
       scene.fog = prevFog; if (!pbrMode) scene.background = prevBg;
-      effects.dispose(); disposeObject(root);
+      effects.dispose(); disposeObject(root); if (keyLight && keyLight.dispose) keyLight.dispose();
       blobGeo.dispose(); blobMat.dispose();
       entries.length = 0;
     },

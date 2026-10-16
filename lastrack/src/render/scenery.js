@@ -3,8 +3,8 @@ import * as THREE from 'three';
 import { MeshBuilder, mulberry32, disposeObject } from './geomUtil.js';
 import { COLOR as K } from './paletteRef.js';
 
-const litMat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
-const glowMat = new THREE.MeshBasicMaterial({ vertexColors: true });
+const litMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.72, metalness: 0.12 });
+const glowMat = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false });
 litMat.userData.shared = glowMat.userData.shared = true;
 
 const pick = (r, a) => a[(r() * a.length) | 0];
@@ -238,14 +238,15 @@ export function scenePlacements(track, { seed = 1337, spacing = 26, gap = 7, max
 export function buildScenery(track, { seed } = {}) {
   const theme = (track.def && track.def.theme) || {};
   const kind = PROPS[theme.scenery] ? theme.scenery : 'junk';
-  const lit = new MeshBuilder();
-  const glow = new MeshBuilder();
+  const lit = new MeshBuilder({ smooth: 50, ao: 0.4, aoSpan: 6, jitter: 0.05 });   // darker bases read as contact shadow / ambient occlusion
+  const glow = new MeshBuilder({ ao: 0, jitter: 0 });
   const r = mulberry32((seed ?? 1337) + kind.length * 101);
   const pl = scenePlacements(track, { seed: seed ?? 1337 });
   for (const p of pl) PROPS[kind](lit, glow, r, p.x, p.z, p.s);
   const group = new THREE.Group();
   group.name = `scenery-${kind}`;
   if (lit.triCount) group.add(new THREE.Mesh(lit.build(), litMat));
+  for (let i = 0; i < glow.c.length; i++) glow.c[i] *= 1.6;   // >1 so the emissive bands bloom when the PBR post stack is on
   if (glow.triCount) group.add(new THREE.Mesh(glow.build(), glowMat));
   return { group, count: pl.length, kind, tris: lit.triCount + glow.triCount, dispose: () => disposeObject(group) };
 }

@@ -1,7 +1,9 @@
 // Precomputed racing line: lateral offset per sample (cached per track) and target-speed profile (per car stats).
-import { TUNING, gripAccel } from '../carPhysics.js';
+import { TUNING, gripAccel, brakeLimit } from '../carPhysics.js';
 
 const lineCache = new Map();
+export const AI_CORNER_GRIP = 0.78;   // fraction of the tyre grip the AI plans to corner on (arcade grip is huge; leave the player a chance)
+export const AI_BRAKE_USE = 0.8;      // fraction of the real braking limit the speed planner assumes
 const EDGE_MARGIN = 3.6;     // m kept between the line and each wall
 
 /** Offset (+ = right of centreline) and signed line curvature per sample. Cached by track id. */
@@ -37,8 +39,8 @@ export function getRacingLine(track) {
 export function buildSpeedProfile(track, stats, pace = 1) {
   const line = getRacingLine(track);
   const n = line.n, ds = line.ds;
-  const aLat = gripAccel(stats) * 0.88;
-  const aBrake = Math.min(stats.brake ?? 40, gripAccel(stats) * 1.0) * 0.6;
+  const aLat = gripAccel(stats) * AI_CORNER_GRIP;
+  const aBrake = brakeLimit(stats) * AI_BRAKE_USE;
   const v = new Float64Array(n);
   for (let i = 0; i < n; i++) {
     const k = Math.abs(line.curv[i]);

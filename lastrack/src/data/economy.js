@@ -2,7 +2,9 @@
 import { getCar } from './cars.js';
 import { getWeapon } from './weapons.js';
 import { UPGRADES, getUpgrade, upgradeCost, applyUpgrades } from './upgrades.js';
-import { TRACKS, getTrack } from './tracks/index.js';
+import { TRACKS, GAME_TRACKS, getTrack } from './tracks/index.js';
+import { getPaint, getAccent, isNumberStr, PAINTS } from './liveries.js';
+import { getDecal, normalizePlacement, MAX_DECALS } from './decals.js';
 
 export const STARTING_CASH = 5000;
 export const KILL_BONUS = 500;
@@ -107,7 +109,8 @@ export function applyRaceResult(save, result, { mode = 'race', nCars = result?.f
   let unlocked = [...save.unlockedTracks];
   let unlockedTrack = null;
   if (p.position === 1 && track) {
-    const next = TRACKS[TRACKS.indexOf(track) + 1];
+    const list = GAME_TRACKS.includes(track) ? GAME_TRACKS : TRACKS;   // the game's own track ladder, or the legacy one
+    const next = list[list.indexOf(track) + 1];
     if (next && !unlocked.includes(next.id)) { unlocked.push(next.id); unlockedTrack = next.id; }
   }
   const ammoMap = new Map((p.ammoLeft || []).map((a) => [a.id, a.ammo]));
@@ -123,4 +126,40 @@ export function applyRaceResult(save, result, { mode = 'race', nCars = result?.f
     unlockedTracks: unlocked,
   };
   return { save: out, prize, killBonus: bonus, total: prize + bonus, unlockedTrack };
+}
+
+// ---------------------------------------------------------------- paint & decals (cosmetic; money only for buying decals)
+export function setPaint(save, id) { return getPaint(id) ? { ok: true, save: { ...save, paint: id } } : fail(save, 'unknown-paint'); }
+export function setAccent(save, id) { return getAccent(id) ? { ok: true, save: { ...save, accent: id } } : fail(save, 'unknown-accent'); }
+export function setNumber(save, n) {
+  const s = String(n ?? '').trim();
+  return s === '' || isNumberStr(s) ? { ok: true, save: { ...save, number: s } } : fail(save, 'bad-number');
+}
+export function purchaseDecal(save, id) {
+  const d = getDecal(id);
+  if (!d) return fail(save, 'unknown-decal');
+  if ((save.decalsOwned || []).includes(id)) return fail(save, 'already-owned');
+  if (save.cash < d.price) return fail(save, 'insufficient-cash');
+  return { ok: true, cost: d.price, save: { ...save, cash: save.cash - d.price, decalsOwned: [...(save.decalsOwned || []), id] } };
+}
+/** Place an owned decal (free). At most MAX_DECALS placed; the same decal may be placed several times. */
+export function placeDecal(save, placement) {
+  const p = normalizePlacement(placement, PAINTS.map((x) => x.id));
+  if (!p) return fail(save, 'bad-decal');
+  if (!(save.decalsOwned || []).includes(p.id)) return fail(save, 'not-owned');
+  if ((save.decals || []).length >= MAX_DECALS) return fail(save, 'decal-limit');
+  return { ok: true, save: { ...save, decals: [...(save.decals || []), p] } };
+}
+/** Replace the placement at `index` with a patched copy (free). */
+export function updateDecal(save, index, patch) {
+  const cur = (save.decals || [])[index];
+  if (!cur) return fail(save, 'no-such-decal');
+  const p = normalizePlacement({ ...cur, ...patch }, PAINTS.map((x) => x.id));
+  if (!p) return fail(save, 'bad-decal');
+  if (!(save.decalsOwned || []).includes(p.id)) return fail(save, 'not-owned');
+  return { ok: true, save: { ...save, decals: save.decals.map((d, i) => (i === index ? p : d)) } };
+}
+export function removeDecal(save, index) {
+  if (!(save.decals || [])[index]) return fail(save, 'no-such-decal');
+  return { ok: true, save: { ...save, decals: save.decals.filter((_, i) => i !== index) } };
 }

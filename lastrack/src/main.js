@@ -11,7 +11,7 @@ function showFatal(title, message) {
   const h2 = document.createElement('h2'); h2.textContent = title;
   const p = document.createElement('p'); p.textContent = message;
   const hint = document.createElement('p'); hint.className = 'muted';
-  hint.textContent = 'Last Track needs a modern browser with WebGL and must be served over http (npm run serve, then open http://localhost:8000).';
+  hint.textContent = 'Last Track needs a modern browser with WebGL and must be served over http (npm run serve, then open http://localhost:8123).';
   const btn = document.createElement('button'); btn.className = 'btn btn-primary'; btn.textContent = 'RELOAD';
   btn.onclick = () => location.reload();
   box.append(h2, p, hint, btn);
@@ -25,13 +25,12 @@ try {
   const canvas = document.getElementById('game-canvas');
   const root = document.getElementById('ui-root');
   let storage;
-  const slice = params.get('slice') === '1';
-  if (params.get('fresh') === '1' || slice) {
+  if (params.get('fresh') === '1') {
     const { createMemoryStorage } = await import('./core/storage.js');
     storage = createMemoryStorage();
   }
   const { createGame } = await import('./game/game.js');
-  const game = createGame({ root, canvas, storage, slice, sliceStyle: params.get('style') === 'retro' ? 'retro' : 'pbr', quality: params.get('q') || undefined, onError: (m) => debug.pushError(m) });
+  const game = createGame({ root, canvas, storage, quality: params.get('q') || undefined, onError: (m) => debug.pushError(m) });
   debug.attach(game);
   window.addEventListener('pagehide', () => { try { game.dispose(); } catch { /* ignore */ } });
 } catch (e) {
