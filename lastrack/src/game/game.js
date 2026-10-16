@@ -24,6 +24,9 @@ import { createFlowMachine } from '../ui/flowMachine.js';
 import { createInput } from '../ui/input.js';
 import { createTouchControls } from '../ui/touchControls.js';
 import { createHud } from '../ui/hud.js';
+import { createAnalytics } from '../analytics.js';
+import { attachAnalytics } from '../analyticsWiring.js';
+import { VERSION } from '../version.js';
 import { createOverlays } from '../ui/overlays.js';
 import { h } from '../ui/dom.js';
 import { createTitleScreen } from '../ui/screens/title.js';
@@ -75,6 +78,7 @@ export function createGame({ root, canvas, storage, onError = () => {}, quality 
   let saveData = store.load();
   const reportError = (e) => {
     console.error('[game]', e);
+    try { bus.emit('error', e && e.message ? e.message : String(e)); } catch { /* ignore */ }
     try { onError(e && (e.stack || e.message) ? String(e.stack || e.message) : String(e)); } catch { /* ignore */ }
   };
 
@@ -98,7 +102,7 @@ export function createGame({ root, canvas, storage, onError = () => {}, quality 
   let snapA = null, snapB = null, acc = 0, endTimer = 0, wreckTimer = 0, finalized = false;
   let lastResult = null;
   let rafId = 0, lastT = 0, disposed = false, muted = false;
-  const perf = { fps: 60, frameMs: 16 };
+  const perf = { fps: 60, frameMs: 16, sum: 0, n: 0 };
   let firstFrameResolve; const firstFrame = new Promise((r) => { firstFrameResolve = r; });
 
   const game = {
@@ -122,10 +126,11 @@ export function createGame({ root, canvas, storage, onError = () => {}, quality 
     getSave: () => saveData,
     setSave: (s) => commit(s),
     hasSavedGame: () => store.exists(),
-    newGame() { saveData = store.reset(); raceSetup = { ...raceSetup, trackId: SLICE_TRACK_ID, laps: 3, mode: 'race' }; return saveData; },
+    newGame() { saveData = store.reset(); bus.emit('game:new'); raceSetup = { ...raceSetup, trackId: SLICE_TRACK_ID, laps: 3, mode: 'race' }; return saveData; },
     chooseCar(carId) {
       const r = economy.chooseCar(saveData, carId);
       if (!r.ok) throw new Error('chooseCar: ' + r.error);
+      bus.emit('car:chosen', { carId });
       return commit(r.save);
     },
     /** buy('upgrade'|'weapon'|'ammo'|'repair', id) -> {ok, error?} */
@@ -139,7 +144,7 @@ export function createGame({ root, canvas, storage, onError = () => {}, quality 
       else return { ok: false, error: 'Unknown purchase.' };
       if (!r.ok) return { ok: false, error: ERRORS[r.error] || r.error };
       commit(r.save);
-      bus.emit('purchase', { kind, id });
+      bus.emit('purchase', { kind, id, cost: r.cost || 0, balance: saveData.cash, level: (kind === 'upgrade' ? saveData.upgrades[id] : kind === 'spikes' ? saveData.spikes[id] : 0) });
       return { ok: true };
     },
     /** Quick start (debug / `?slice=1` alias): fresh save with the Hammer, straight into a race on the first track. */
@@ -153,7 +158,7 @@ export function createGame({ root, canvas, storage, onError = () => {}, quality 
     /** The player's resolved livery for a car (default: the saved car). Used by every 3D preview. */
     liveryOf: (carId) => playerLivery(carId ? { ...saveData, carId } : saveData),
     getRaceSetup: () => raceSetup,
-    setRaceSetup(p) { raceSetup = { ...raceSetup, ...p }; return raceSetup; },
+    setRaceSetup(p) { raceSetup = { ...raceSetup, ...p }; bus.emit('race:setup', raceSetup); return raceSetup; },
     driverName: (r) => (r.isPlayer ? 'YOU (the rookie)' : getDriver(r.driverId)?.name ?? `Car ${r.carId}`),
     createPreview(c) {
       try { return createCarPreview(c); } catch (e) { reportError(e); return null; }
@@ -166,12 +171,17 @@ export function createGame({ root, canvas, storage, onError = () => {}, quality 
     if (!r.ok) return { ok: false, error: ERRORS[r.error] || r.error };
     commit(r.save); stage?.setLivery?.(playerLivery(saveData));
     bus.emit('livery:changed', playerLivery(saveData));
+    if (r.cost > 0) bus.emit('purchase', { kind: 'decal', id: String(a[0] && a[0].id || a[0] || ''), cost: r.cost, balance: saveData.cash, level: 0 });
     return { ok: true, cost: r.cost || 0 };
   };
   Object.assign(game, {
     setPaint: liveryCall(economy.setPaint), setAccent: liveryCall(economy.setAccent), setNumber: liveryCall(economy.setNumber),
     buyDecal: liveryCall(economy.purchaseDecal), placeDecal: liveryCall(economy.placeDecal), updateDecal: liveryCall(economy.updateDecal), removeDecal: liveryCall(economy.removeDecal),
   });
+
+  // ---------- analytics (GA4 events; opt-out in Settings) ----------
+  const analytics = createAnalytics({ getOptIn: () => settings.analytics });
+  game.analytics = analytics;
 
   // ---------- settings ----------
   function applySettings(prev) {
@@ -191,6 +201,7 @@ export function createGame({ root, canvas, storage, onError = () => {}, quality 
     settings = normalizeSettings({ ...settings, ...patch });
     saveSettings(settingsStorage, settings);
     applySettings(prev);
+    if (prev.analytics !== settings.analytics) analytics.setOptIn(settings.analytics);
     bus.emit('settings:changed', settings);
     return settings;
   };
@@ -326,6 +337,8 @@ export function createGame({ root, canvas, storage, onError = () => {}, quality 
     } catch (e) { reportError(e); }
   });
   applySettings(null);
+  analytics.setOptIn(settings.analytics);
+  try { attachAnalytics(game, { analytics, version: VERSION, touch: document.body.classList.contains('touch') }); } catch (e) { console.error('[analytics]', e); }
   { if (stage) { stage.setCar({ carId: 'hammer', color: 9 }); stage.setMode('title', { side: 1 }); stage.show(); document.body.classList.add('scene3d'); } showScreen('title', {}); }
   audio?.setScene('menu'); // plays once the first user gesture creates the AudioContext
 
@@ -335,6 +348,7 @@ export function createGame({ root, canvas, storage, onError = () => {}, quality 
     if (lastT) { perf.frameMs += ((t - lastT) - perf.frameMs) * 0.1; perf.fps = 1000 / Math.max(perf.frameMs, 0.1); }
     lastT = t;
     const st = flow.state;
+    if (st === 'race') { perf.sum += perf.fps; perf.n++; }
     if (st === 'race' && sim) {
       // hit-stop / slow-mo on wrecks and big hits: the controller scales the real frame time the sim is fed (sim stays deterministic)
       const ts = controller && controller.stepTime ? controller.stepTime(dt) : 1;
