@@ -5,6 +5,9 @@ import { icon } from '../icons.js';
 import { podiumOrder } from '../menuLogic.js';
 import { uiHex } from '../colors.js';
 
+/** Money that can go negative (a missed contract's penalty): '−$300'. */
+const signedMoney = (n) => (n < 0 ? '−' : '') + fmtMoney(Math.abs(n));
+
 export function createResultsScreen({ game, flow }) {
   const head = h('div.res-head');
   const podium = h('div.podium');
@@ -34,18 +37,22 @@ export function createResultsScreen({ game, flow }) {
         table.append(h('div.res-row' + (r.isPlayer ? '.me' : ''), { style: { animationDelay: 0.05 * i + 's' } }, h('b', String(r.position)), h('i', { style: { background: colorOf(r) } }), h('span', game.driverName(r)),
           h('span.r', r.wrecked ? 'WRECKED' : r.time != null ? fmtTime(r.time) : 'DNF'), h('span.r', r.kills ? `${r.kills} ✕` : '')));
       });
-      if (summary.mode === 'practice') money.append(h('p.muted', 'Practice: no prize money.'));
-      else {
-        const rows = [['PRIZE', summary.prize], [`KILL BONUS (${summary.kills})`, summary.killBonus], summary.pickupCash ? ['CASH PICKUPS', summary.pickupCash] : null].filter(Boolean);
+      if (summary.mode === 'practice') {
+        money.append(h('p.muted', 'Practice: no prize money.'));
+        if (summary.contractOpen) money.append(h('p.muted.small', 'Your contract stays open for the next race.'));
+      } else {
+        const c = summary.contract;
+        const contractRow = !c ? null : c.complete ? [`CONTRACT · ${c.org} ${c.kills}/${c.quota}`, c.bounty] : ['CONTRACT FAILED', -c.penalty];
+        const rows = [['PRIZE', summary.prize], [`KILL BONUS (${summary.kills})`, summary.killBonus], summary.pickupCash ? ['CASH PICKUPS', summary.pickupCash] : null, contractRow].filter(Boolean);
         let delay = 150;
         for (const [label, v] of rows) {
           const val = h('b', fmtMoney(0));
           money.append(h('div.pay-row', h('span', label), val));
-          stops.push(animateCount(val, v, { fmt: fmtMoney, delay, ms: 800 })); delay += 250;
+          stops.push(animateCount(val, v, { fmt: signedMoney, delay, ms: 800 })); delay += 250;
         }
         const tot = h('b', fmtMoney(0));
         money.append(h('div.pay-row.total', h('span', 'TOTAL'), tot));
-        stops.push(animateCount(tot, summary.total + (summary.pickupCash || 0), { fmt: fmtMoney, delay, ms: 1100 }));
+        stops.push(animateCount(tot, summary.total + (summary.pickupCash || 0) + (summary.contractNet || 0), { fmt: signedMoney, delay, ms: 1100 }));
         if (summary.damageFraction > 0) money.append(h('p.muted.small', { style: { marginTop: '8px' } }, `Car damage ${Math.round(summary.damageFraction * 100)}% — repair it in the garage.`));
         if (summary.newBest) money.append(h('span.badge', icon('trophy', { size: 14 }), 'New best time'));
         if (summary.unlocked) money.append(h('span.badge', icon('lock', { size: 14 }), 'Track unlocked: ' + summary.unlocked));

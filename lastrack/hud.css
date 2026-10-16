@@ -67,6 +67,25 @@
 
 /* ---------- top-left: position + lap ---------- */
 .hud .hud-tl { top: calc(var(--edge) + var(--sa-t)); left: calc(var(--edge) + var(--sa-l)); padding: 8px 16px 10px 14px; min-width: 132px; }
+/* rival status list: under the position panel. Status face, name, armour bar and percentage per racer */
+.hud .hud-status { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; padding-top: 7px; border-top: 1px solid rgba(53, 230, 255, .2); }
+.hud .hud-status:empty { display: none; }
+.hud .hud-status-row { display: flex; align-items: center; gap: 6px; font-family: var(--h-display); font-size: clamp(10px, 1.9vh, 12px); letter-spacing: .06em; text-transform: uppercase; color: var(--h-text); }
+.hud .hud-status-face { flex: none; display: inline-flex; }
+.hud .hud-status-face .hud-face { stroke-width: 2.4; color: var(--h-lime); filter: drop-shadow(0 0 3px currentColor); }
+.hud .hud-status-row.hurt .hud-face { color: var(--h-amber); }
+.hud .hud-status-row.burn .hud-face { color: var(--h-red); }
+.hud .hud-status-row.dead .hud-face { color: var(--h-dim); }
+.hud .hud-status-row.fin .hud-face { color: var(--h-magenta); }
+.hud .hud-status-name { flex: 1 1 auto; min-width: 0; max-width: 15ch; text-transform: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+.hud .hud-status-bar { flex: none; width: 52px; height: 5px; border-radius: 3px; background: rgba(255, 255, 255, .12); overflow: hidden; }
+.hud .hud-status-fill { display: block; height: 100%; background: var(--h-lime); box-shadow: 0 0 6px currentColor; transition: width .25s linear; }
+.hud .hud-status-row.hurt .hud-status-fill { background: var(--h-amber); }
+.hud .hud-status-row.burn .hud-status-fill { background: var(--h-red); }
+.hud .hud-status-row b { flex: none; min-width: 3.4em; text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--h-dim); }
+.hud .hud-status-row.fin b { color: var(--h-magenta); }
+.hud .hud-status-row.dead { opacity: .5; }
+.hud .hud-status-row.dead .hud-status-name { text-decoration: line-through; }
 .hud .hud-pos { display: flex; align-items: baseline; font-family: var(--h-display); font-style: italic; font-weight: 800; line-height: .95; }
 .hud .hud-pos-n { font-size: clamp(38px, 9.5vh, 68px); color: var(--h-cyan); text-shadow: 0 0 18px rgba(53, 230, 255, .55); }
 .hud .hud-pos-sfx { font-size: clamp(14px, 3.2vh, 22px); margin-left: 2px; color: var(--h-cyan); text-transform: uppercase; }
@@ -74,6 +93,9 @@
 .hud .hud-lap { display: flex; align-items: center; gap: 6px; margin-top: 4px; font-family: var(--h-display); font-size: clamp(11px, 2.4vh, 15px); letter-spacing: .16em; text-transform: uppercase; color: var(--h-dim); }
 .hud .hud-lap .lt-icon { color: var(--h-amber); }
 .hud .hud-lap-val { color: var(--h-text); font-weight: 800; letter-spacing: .08em; font-variant-numeric: tabular-nums; }
+/* side contract tally under the lap: shown only while a contract counts for this race */
+.hud .hud-contract { display: flex; align-items: center; gap: 6px; margin-top: 3px; font-family: var(--h-display); font-size: clamp(10px, 2vh, 13px); letter-spacing: .14em; text-transform: uppercase; color: var(--h-amber); white-space: nowrap; }
+.hud .hud-contract .lt-icon { color: var(--h-amber); }
 .hud .hud-pips { display: flex; gap: 4px; margin-top: 7px; }
 .hud .hud-pip { display: block; flex: 1; min-width: 14px; max-width: 26px; height: 4px; border-radius: 2px; background: var(--h-line); }
 .hud .hud-pip.done { background: var(--h-cyan); opacity: .75; }
@@ -309,6 +331,10 @@ html.touch .tc, body.touch .tc { display: flex; }
 .np-row{display:flex;align-items:center;gap:5px;padding:2px 9px;border-radius:3px;background:rgba(6,10,18,.62);border-left:2px solid var(--acc);backdrop-filter:blur(3px)}
 .np-name{font:700 12px/1.1 'Rajdhani','Segoe UI',system-ui,sans-serif;letter-spacing:.09em;text-transform:uppercase;color:var(--acc);text-shadow:0 0 6px rgba(0,0,0,.9),0 1px 2px #000;white-space:nowrap}
 .np-skull{display:none;color:#ff5a4a;line-height:0}
+/* status face on each plate, coloured like the standings faces */
+.np-face{display:inline-flex;flex:none;line-height:0;color:#5dff9d;filter:drop-shadow(0 0 3px currentColor)}
+.np-face.hurt{color:#ffb02e}.np-face.burn{color:#ff4466}.np-face.dead{color:#8da4bd}.np-face.fin{color:#ff3df0}
+.np-face-svg{display:block;width:14px;height:14px;stroke-width:2.4}
 .np.dead .np-skull{display:inline-block}.np.dead .np-name{color:#aab;opacity:.75}
 .np-bar{width:92px;height:4px;border-radius:2px;background:rgba(0,0,0,.6);box-shadow:0 0 0 1px rgba(255,255,255,.14);overflow:hidden}
 .np-fill{height:100%;width:100%;transition:width .12s linear}

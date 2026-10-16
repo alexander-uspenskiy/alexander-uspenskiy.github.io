@@ -6,6 +6,7 @@ import { TRACKS, GAME_TRACKS, getTrack } from './tracks/index.js';
 import { getPaint, getAccent, isNumberStr, PAINTS } from './liveries.js';
 import { getSpike, spikeCost, normalizeSpikes, noSpikes, SPIKE_TIERS } from './spikes.js';
 import { getDecal, normalizePlacement, MAX_DECALS } from './decals.js';
+import { getPatron, quotaFor } from './contracts.js';
 
 export const STARTING_CASH = 5000;
 export const KILL_BONUS = 500;
@@ -138,6 +139,31 @@ export function applyRaceResult(save, result, { mode = 'race', nCars = result?.f
     unlockedTracks: unlocked,
   };
   return { save: out, prize, killBonus: bonus, total: prize + bonus, unlockedTrack };
+}
+
+// ---------------------------------------------------------------- contracts (side bids; one at a time)
+/** Lock in a patron's bid from the board. The quota is the one the board showed for this save. */
+export function acceptContract(save, patronId) {
+  const p = getPatron(patronId);
+  if (!p) return fail(save, 'unknown-patron');
+  if (save.contract) return fail(save, 'contract-active');
+  return { ok: true, save: { ...save, contract: { patron: p.id, quota: quotaFor(save, p) } } };
+}
+
+/**
+ * Settle the active contract when a race ends. Race mode only: practice leaves it open for the next real race.
+ * `kills` = the player's kills in that race (counts even if the player wrecked out). Quota met: bounty paid.
+ * Missed: the patron's penalty is taken, never below zero. Returns { save, settled|null }.
+ */
+export function settleContract(save, { mode = 'race', kills = 0 } = {}) {
+  const c = save.contract, p = c && getPatron(c.patron);
+  if (!c || !p || mode !== 'race') return { save, settled: null };
+  const k = Math.max(0, Math.floor(Number(kills) || 0));
+  const complete = k >= c.quota;
+  const bounty = complete ? c.quota * p.perKill : 0;
+  const penalty = complete ? 0 : Math.min(p.penalty, save.cash);
+  const settled = { patron: p.id, org: p.org, quota: c.quota, kills: k, complete, bounty, penalty, net: bounty - penalty };
+  return { save: { ...save, cash: save.cash + bounty - penalty, contract: null }, settled };
 }
 
 // ---------------------------------------------------------------- paint & decals (cosmetic; money only for buying decals)

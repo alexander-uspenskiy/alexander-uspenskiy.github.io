@@ -91,9 +91,10 @@ export function createGarageScreen({ game, flow }) {
       button('TO THE TRACK', () => flow.transition('trackSelect'), 'btn-primary btn-nav-track')));
   return {
     el,
-    show() {
+    /** params (optional): { notice, noticeBad } — set when a race was left and its contract settled */
+    show(p) {
       detach = attachMenuKeys(el);
-      say('');
+      say(p?.notice || '', !!p?.noticeBad);
       stageApi = useStage(game, el, { side: -1, mode: 'garage' });
       render(); refreshCar();
     },

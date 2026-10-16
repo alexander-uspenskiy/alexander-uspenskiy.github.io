@@ -5,6 +5,7 @@ import { h, setText, setStyle, setClass, setChildren, kph, ordinal } from './dom
 import { createDash, gearLabel } from './dash.js';
 import { icon, weaponIcon, carSilhouette, setDamageZones, damageColor } from './icons.js';
 import * as paletteRef from '../render/paletteRef.js';
+import { contractProgress } from '../data/contracts.js';
 
 const FEED_MAX = 4;
 const FEED_LIFE = 5; // s
@@ -57,7 +58,12 @@ export function coracerFace(car) {
   if (car.armorMax > 0 && car.armor / car.armorMax < 0.35) return 'hurt';
   return 'ok';
 }
-const FACE_ICON = { ok: 'faceOk', hurt: 'faceHurt', burn: 'faceBurn', dead: 'faceDead', fin: 'faceFin' };
+export const FACE_ICON = { ok: 'faceOk', hurt: 'faceHurt', burn: 'faceBurn', dead: 'faceDead', fin: 'faceFin' };
+/** Pure: a co-racer's armour as the status list shows it: pct 0..1, and the label (FIN, OUT or the percentage). */
+export function rivalHealth(car) {
+  const pct = car.armorMax > 0 ? Math.min(1, Math.max(0, car.armor / car.armorMax)) : 0;
+  return { pct, label: car.finished ? 'FIN' : car.wrecked ? 'OUT' : Math.round(pct * 100) + '%' };
+}
 
 // ui-local neon fallback for the 16 car colour slots (used when render/paletteRef has no MODERN_HEX yet)
 export const CHIP_FALLBACK = [
@@ -141,6 +147,9 @@ export function createHud({ root, getWeapon = (id) => ({ name: id }) } = {}) {
   const posOf = h('span.hud-pos-of', '/8');
   const lapVal = h('span.hud-lap-val', '1/3');
   const pips = h('div.hud-pips');
+  const statusList = h('div.hud-status');   // rival status list under the position panel
+  const contractTxt = h('span');
+  const contractTag = h('div.hud-contract.hidden', icon('target', { size: 13 }), contractTxt);   // side contract tally (race mode, when one is open)
   // --- right: minimap + standings ---
   const mapCanvas = h('canvas.hud-map', { width: 180, height: 180 });
   const board = h('div.hud-board');
@@ -171,7 +180,7 @@ export function createHud({ root, getWeapon = (id) => ({ name: id }) } = {}) {
     fx, vignette,
     h('div.hud-tl.hud-glass',
       h('div.hud-pos', posN, posSfx, posOf),
-      h('div.hud-lap', icon('lap', { size: 14 }), h('span.hud-lap-label', 'LAP'), lapVal), pips),
+      h('div.hud-lap', icon('lap', { size: 14 }), h('span.hud-lap-label', 'LAP'), lapVal), pips, contractTag, statusList),
     h('div.hud-tr',
       h('div.hud-map-frame', mapCanvas),
       h('div.hud-board-wrap.hud-glass', board)),
@@ -184,6 +193,31 @@ export function createHud({ root, getWeapon = (id) => ({ name: id }) } = {}) {
 
   let minimap = null;
   let names = [];
+  // rival status list under the position panel: a small status face, name, armour bar and percentage per racer.
+  // The rows are reused, and the list is rebuilt only when the running order changes.
+  const statusRows = new Map();
+  let statusKey = '';
+  function updateStatus(snap) {
+    if (!snap) return;
+    const rivals = snap.cars.filter((c) => !c.isPlayer).sort((a, b) => (a.position ?? 99) - (b.position ?? 99));
+    for (const id of [...statusRows.keys()]) if (!rivals.some((c) => c.id === id)) statusRows.delete(id);
+    for (const c of rivals) {
+      let row = statusRows.get(c.id);
+      if (!row) {
+        row = { el: h('div.hud-status-row'), face: null, slot: h('span.hud-status-face'), fill: h('i.hud-status-fill'), pct: h('b'), name: h('span.hud-status-name', c.name) };
+        row.el.append(row.slot, row.name, h('span.hud-status-bar', row.fill), row.pct);
+        statusRows.set(c.id, row);
+      }
+      const face = coracerFace(c);
+      if (row.face !== face) { row.face = face; setChildren(row.slot, icon(FACE_ICON[face], { size: 14, cls: 'hud-face ' + face })); }
+      for (const f of ['ok', 'hurt', 'burn', 'dead', 'fin']) setClass(row.el, f, f === face);
+      const { pct, label } = rivalHealth(c);
+      setStyle(row.fill, 'width', (pct * 100).toFixed(1) + '%');
+      setText(row.pct, label);
+    }
+    const key = rivals.map((c) => c.id).join(',');
+    if (key !== statusKey) { statusKey = key; setChildren(statusList, ...rivals.map((c) => statusRows.get(c.id).el)); }
+  }
   let feedItems = [];
   let lastT = 0;
   let toastTimer = 0;
@@ -196,6 +230,7 @@ export function createHud({ root, getWeapon = (id) => ({ name: id }) } = {}) {
   let prevArmor = -1;
   let prevDmg = null;
   let lastMsg = '';
+  let contract = null, contractDone = false;
 
   function dropFeedItem(it) { if (it.el) it.el.remove(); }
   function addFeed(text, t, kill) {
@@ -222,9 +257,12 @@ export function createHud({ root, getWeapon = (id) => ({ name: id }) } = {}) {
 
   const api = {
     el,
-    /** begin({ createMinimap, track, names:[...], hero, carId? }) */
-    begin({ createMinimap, track, names: n = [], hero = false, carId } = {}) {
+    /** begin({ createMinimap, track, names:[...], hero, carId?, contract? }) — contract: the open side contract, if this race counts for it */
+    begin({ createMinimap, track, names: n = [], hero = false, carId, contract: c = null } = {}) {
       names = n;
+      contract = c; contractDone = false;
+      setText(contractTxt, contractProgress(c, 0));
+      setClass(contractTag, 'hidden', !c);
       dash.setEnabled(hero);
       dash.setCar?.(carId);
       setClass(el, 'hud-hero', hero);
@@ -360,8 +398,14 @@ export function createHud({ root, getWeapon = (id) => ({ name: id }) } = {}) {
           const face = coracerFace(c);
           return h('div.hud-row' + (c.isPlayer ? '.me' : '') + (c.wrecked ? '.dead' : '') + (c.finished ? '.fin' : ''),
             h('b', String(c.position ?? i + 1)), h('i.hud-chip', { style: { background: c.livery ? '#' + (c.livery.paintHex >>> 0).toString(16).padStart(6, '0') : carChip(c.color) } }), h('span', c.name),
-            ...(c.isPlayer ? [] : [icon(FACE_ICON[face], { size: 13, cls: 'hud-face ' + face })]));
+            ...(c.isPlayer ? [] : [icon(FACE_ICON[face], { size: 16, cls: 'hud-face ' + face })]));
         }));
+      }
+
+      // --- side contract: live tally, and a toast the moment the quota is met ---
+      if (contract) {
+        setText(contractTxt, contractProgress(contract, me.kills));
+        if (!contractDone && me.kills >= contract.quota) { contractDone = true; api.toast('CONTRACT COMPLETE', 1600); }
       }
 
       // --- events -> feed / toasts ---
@@ -405,6 +449,7 @@ export function createHud({ root, getWeapon = (id) => ({ name: id }) } = {}) {
       }
       lastMsg = msg;
       try { minimap?.draw(snap); } catch (e) { minimap = null; console.error('[hud] minimap draw', e); }
+      updateStatus(snap);
     },
     dispose() { clearTimeout(toastTimer); el.remove(); },
     dash,

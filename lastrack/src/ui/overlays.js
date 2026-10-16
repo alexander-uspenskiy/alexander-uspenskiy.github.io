@@ -1,6 +1,8 @@
 // In-race world-anchored overlays: competitor nameplates (name + armour bar + skull when wrecked) and the guided-missile
 // lock reticle. Pooled DOM nodes, screen-space projection from the camera matrices, no per-frame allocation.
 import * as THREE from 'three';
+import { icon } from './icons.js';
+import { coracerFace, FACE_ICON } from './hud.js';
 
 export const PLATE_MAX = 5;          // plates shown at once (nearest first)
 export const PLATE_RANGE = 150;      // m: beyond this no plate
@@ -38,11 +40,12 @@ function makePlate() {
   const el = document.createElement('div'); el.className = 'np';
   const name = document.createElement('span'); name.className = 'np-name';
   const skull = document.createElement('i'); skull.className = 'np-skull'; skull.innerHTML = SKULL;
-  const row = document.createElement('div'); row.className = 'np-row'; row.append(skull, name);
+  const face = document.createElement('i'); face.className = 'np-face';   // status face: ok, hurt, burn, dead, fin
+  const row = document.createElement('div'); row.className = 'np-row'; row.append(skull, face, name);
   const bar = document.createElement('div'); bar.className = 'np-bar';
   const fill = document.createElement('div'); fill.className = 'np-fill'; bar.append(fill);
   el.append(row, bar);
-  return { el, name, skull, fill, nameStr: '', accent: '', carId: -1, deadFor: 0, vis: false };
+  return { el, name, skull, face, faceKey: '', fill, nameStr: '', accent: '', carId: -1, deadFor: 0, vis: false };
 }
 
 export function createOverlays({ root }) {
@@ -107,10 +110,12 @@ export function createOverlays({ root }) {
         if (!p || p.used) { p = null; for (const q of plates) if (!q.used && (!q.vis || q.carId < 0)) { p = q; break; } if (!p) for (const q of plates) if (!q.used) { p = q; break; } if (!p) continue; byCar.set(c.id, p); }
         p.used = true; shown++;
         const look = plateLook(d);
-        if (p.carId !== c.id) { p.carId = c.id; p.nameStr = ''; p.accent = ''; }
+        if (p.carId !== c.id) { p.carId = c.id; p.nameStr = ''; p.accent = ''; p.faceKey = ''; }
         if (p.nameStr !== c.name) { p.nameStr = c.name; p.name.textContent = c.name; }
         const acc = c.livery ? hex(c.livery.accentHex ?? c.livery.paintHex) : '#9ff';
         if (p.accent !== acc) { p.accent = acc; p.el.style.setProperty('--acc', acc); }
+        const status = coracerFace(c);
+        if (p.faceKey !== status) { p.faceKey = status; p.face.className = 'np-face ' + status; p.face.replaceChildren(icon(FACE_ICON[status], { size: 14, cls: 'np-face-svg' })); }
         const frac = c.armorMax > 0 ? Math.max(0, c.armor / c.armorMax) : 0;
         p.fill.style.width = (frac * 100).toFixed(0) + '%';
         p.fill.style.background = healthColor(frac);

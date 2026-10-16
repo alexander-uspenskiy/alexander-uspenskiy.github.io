@@ -1,4 +1,4 @@
-// PBR "Neon Loop" circuit (slice-only): wet asphalt with procedural normal/roughness maps, kerbs and paint, concrete + steel barriers,
+// PBR slice circuits (Neon Loop, Foundry Run): wet asphalt with procedural normal/roughness maps, kerbs and paint, concrete + steel barriers,
 // neon strips, holographic billboards, light poles with shafts/pools and a few real dynamic lights, fog banks, ruined skyline towers.
 // buildPbrTrackGeometry() is Node-safe (builders only); buildPbrTrack() creates textures, materials and meshes.
 import * as THREE from 'three';
@@ -6,6 +6,7 @@ import { TB } from '../heroTrack.js';
 import { COLOR as K } from '../paletteRef.js';
 import { mulberry32 } from '../../core/mathUtil.js';
 import { asphaltMaps, concreteMaps, brushedMaps, holoBillboard, fogSprite } from './maps.js';
+import { STEELWORKS_KIT, addSteelworks, createSteelworksFx } from './steelworks.js';
 
 export const PBR_CHUNKS = 6;
 const grey = (t) => [t, t, t];
@@ -22,6 +23,8 @@ export const BILLBOARDS = [['HAMMER', [255, 90, 40]], ['NEON LOOP', [60, 230, 25
 export function buildPbrTrackGeometry(track, { seed = 77 } = {}) {
   const n = track.n, L = track.length, half = track.width / 2, def = track.def || {}, sf = def.surfaces || {}, S = track.samples;
   const rng = mulberry32(seed);
+  const look = def.look || {}, kit = look.kit === 'steelworks' ? STEELWORKS_KIT : null;   // Foundry Run: steelworks kit
+  const tone = (t) => (kit ? kit.roadTone.map((k) => t * k) : grey(t));
   const mk = () => ({ road: new TB(), paint: new TB(), barrier: new TB(), steel: new TB(), props: new TB(), emissive: new TB(), shafts: new TB() });
   const chunks = Array.from({ length: PBR_CHUNKS }, mk);
   const chunkAt = (i) => chunks[Math.min(PBR_CHUNKS - 1, Math.floor((((i % n) + n) % n) / n * PBR_CHUNKS))];
@@ -43,7 +46,7 @@ export function buildPbrTrackGeometry(track, { seed = 77 } = {}) {
     for (let j = 0; j < D.length - 1; j++) {
       const p = [W(i, D[j]), W(i, D[j + 1]), W(i + 1, D[j + 1]), W(i + 1, D[j])];
       const u0 = (D[j] + half) / 8, u1 = (D[j + 1] + half) / 8;
-      ck.road.quadRaw(p, [[u0, s0 / 8], [u1, s0 / 8], [u1, s1 / 8], [u0, s1 / 8]], [grey(TINT[j] * t0), grey(TINT[j + 1] * t0), grey(TINT[j + 1] * t1), grey(TINT[j] * t1)]);
+      ck.road.quadRaw(p, [[u0, s0 / 8], [u1, s0 / 8], [u1, s1 / 8], [u0, s1 / 8]], [tone(TINT[j] * t0), tone(TINT[j + 1] * t0), tone(TINT[j + 1] * t1), tone(TINT[j] * t1)]);
     }
   }
   // ---- paint
@@ -96,7 +99,7 @@ export function buildPbrTrackGeometry(track, { seed = 77 } = {}) {
         tgt.quadRaw(q, uv, tn.map((v) => grey(v)));
       }
       if (hard(i) && t === 'c' && i % 2 === 0) {                 // neon strip on top of the barrier through corners
-        const col = NEON[(Math.floor(i / 24) + sdx) % 2], a = W(i, sd * (half + 0.3), 1.03), b = W(i + 2, sd * (half + 0.3), 1.03);
+        const col = kit ? kit.strips[(Math.floor(i / 24) + sdx) % kit.strips.length] : NEON[(Math.floor(i / 24) + sdx) % 2], a = W(i, sd * (half + 0.3), 1.03), b = W(i + 2, sd * (half + 0.3), 1.03);
         ck.emissive.quadRaw([[a[0], a[1], a[2]], [b[0], b[1], b[2]], [b[0], b[1] + 0.06, b[2]], [a[0], a[1] + 0.06, a[2]]], [[0, 0], [0, 0], [0, 0], [0, 0]], [col, col, col, col]);
       }
     }
@@ -112,7 +115,7 @@ export function buildPbrTrackGeometry(track, { seed = 77 } = {}) {
     ck.props.place(poleProp, base[0], 0, base[2], yaw);
     const head = W(i, sd * (half + 1.7 - 2.5), 8.05);
     lamps.push({ x: head[0], y: 8.05, z: head[2], s: s0.s });
-    const col = (Math.floor(i / 26) % 3 === 0) ? [2.2, 1.5, 0.5] : [1.6, 1.8, 2.2];                 // sodium / LED
+    const col = kit ? kit.lamp : (Math.floor(i / 26) % 3 === 0) ? [2.2, 1.5, 0.5] : [1.6, 1.8, 2.2];                 // sodium / LED
     ck.emissive.box(head[0], 8.02, head[2], 0.9, 0.06, 0.5, K.white, K.white);
     for (let k = 0; k < 4; k++) { const tri = ck.emissive; void tri; }
     // replace palette white with the HDR lamp colour: rewrite the last box's colours
@@ -133,7 +136,9 @@ export function buildPbrTrackGeometry(track, { seed = 77 } = {}) {
   const clear = (x, z, r) => { for (let i = 0; i < n; i += 2) if (Math.hypot(S[i].x - x, S[i].y - z) < half + r) return false; return true; };
   const cx = (bounds.minX + bounds.maxX) / 2, cz = (bounds.minY + bounds.maxY) / 2;
   let placedT = 0;
-  for (let tries = 0; tries < 400 && placedT < 70; tries++) {
+  const sw = kit ? addSteelworks({ n, half, W, smp, chunkAt, clear, hard, towers, towerGlow, rng }) : null;   // kit replaces the ruined towers
+  const bbSet = kit ? kit.billboards : BILLBOARDS;
+  for (let tries = 0; !kit && tries < 400 && placedT < 70; tries++) {
     const i = Math.floor(rng() * n), sd = rng() < 0.5 ? 1 : -1, off = half + 34 + rng() * (rng() < 0.35 ? 170 : 80), p = W(i, sd * off);
     const w = 10 + rng() * 16, d = 10 + rng() * 16, h = 16 + rng() * rng() * 80;
     if (!clear(p[0], p[2], Math.max(w, d) * 0.7 + 24)) continue;
@@ -144,10 +149,10 @@ export function buildPbrTrackGeometry(track, { seed = 77 } = {}) {
     towers.place(b, p[0], 0, p[2], yaw); towerGlow.place(g, p[0], 0, p[2], yaw); placedT++;
   }
   for (let k = 0; k < 6; k++) {                                   // holographic billboards on pylons, facing the track
-    const i = Math.floor(((k + 0.5) / 6) * n), sd = k % 2 ? 1 : -1, p = W(i, sd * (half + 16), 0), s0 = smp(i), yaw = s0.heading + (sd > 0 ? Math.PI : 0);
+    const i = Math.floor(((k + 0.5) / 6) * n), sd = k % 2 ? 1 : -1, p = W(i, sd * (half + 16), 0), s0 = smp(i), yaw = s0.heading + (sd > 0 || kit ? Math.PI : 0);   // kit: every sign faces back down the track, so drivers read it
     if (!clear(p[0], p[2], 8)) continue;
     const ck = chunkAt(i), pyl = new TB(); pyl.box(0, 6, 0, 0.5, 12, 0.5, K.darkGrey, K.black); pyl.box(0, 13.4, 0, 0.3, 0.3, 11, K.darkGrey, K.black); ck.props.place(pyl, p[0], 0, p[2], yaw);
-    billboards.push({ pos: [p[0], 17.5, p[2]], yaw, w: 15, h: 7.5, idx: k % BILLBOARDS.length, chunk: Math.min(PBR_CHUNKS - 1, Math.floor(i / n * PBR_CHUNKS)) });
+    billboards.push({ pos: [p[0], 17.5, p[2]], yaw, w: 15, h: 7.5, idx: k % bbSet.length, chunk: Math.min(PBR_CHUNKS - 1, Math.floor(i / n * PBR_CHUNKS)) });
   }
   const fogSheets = [];
   for (let k = 0; k < 12; k++) { const i = Math.floor(rng() * n), sd = rng() < 0.5 ? 1 : -1, p = W(i, sd * (rng() * 10)); fogSheets.push({ x: p[0], z: p[2], yaw: smp(i).heading, s: 18 + rng() * 22 }); }
@@ -155,7 +160,9 @@ export function buildPbrTrackGeometry(track, { seed = 77 } = {}) {
   const stats = { tris: 0, perLayer: {} };
   for (const ck of chunks) for (const [k, b] of Object.entries(ck)) { stats.perLayer[k] = (stats.perLayer[k] || 0) + b.triCount; stats.tris += b.triCount; }
   for (const [k, b] of Object.entries({ puddles, oil, towers, towerGlow })) { stats.perLayer[k] = b.triCount; stats.tris += b.triCount; }
-  return { chunks, puddles, oil, towers, towerGlow, billboards, lamps, fogSheets, stats, bounds, center: [cx, cz] };
+  return { chunks, puddles, oil, towers, towerGlow, billboards, lamps, fogSheets, stats, bounds, center: [cx, cz],
+    billboardSet: bbSet, billboardTex: kit ? kit.billboardTex : { w: 128, h: 64, fit: false }, steam: kit ? kit.steam : null,
+    plumes: sw ? sw.plumes : [], embers: sw ? sw.embers : [], gantries: sw ? sw.gantries : 0 };
 }
 
 // ---------------------------------------------------------------- runtime
@@ -187,7 +194,7 @@ export function buildPbrTrack(track, opts = {}) {
     puddle: new THREE.MeshPhysicalMaterial({ color: 0x07090d, roughness: 0.02, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.02, envMapIntensity: 2.2, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3, side: THREE.DoubleSide }),
     oil: new THREE.MeshPhysicalMaterial({ color: 0x050407, roughness: 0.08, metalness: 0.6, iridescence: 1, iridescenceIOR: 1.7, iridescenceThicknessRange: [200, 600], envMapIntensity: 2, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4, side: THREE.DoubleSide }),
     tower: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, metalness: 0.1 }),
-    fog: new THREE.MeshBasicMaterial({ map: tex.fog, color: new THREE.Color(0.32, 0.2, 0.34), transparent: true, opacity: 0.32, depthWrite: false, side: THREE.DoubleSide }),
+    fog: new THREE.MeshBasicMaterial({ map: tex.fog, color: new THREE.Color(...(geo.steam || [0.32, 0.2, 0.34])), transparent: true, opacity: 0.32, depthWrite: false, side: THREE.DoubleSide }),
   };
   const owned = [...Object.values(mats), ...Object.values(tex)];
   const meshes = [];
@@ -203,7 +210,8 @@ export function buildPbrTrack(track, opts = {}) {
   const extra = (b, mat, name, maxDist, shadow = false) => { if (!b.triCount) return null; const m = new THREE.Mesh(b.build(), mat); m.name = name; m.userData.maxDist = maxDist; m.receiveShadow = shadow; group.add(m); return m; };
   const pud = extra(geo.puddles, mats.puddle, 'puddles', 330, true), oil = extra(geo.oil, mats.oil, 'oil', 300, true);
   const tw = extra(geo.towers, mats.tower, 'towers', 900), twg = extra(geo.towerGlow, mats.emissive, 'tower-glow', 900);
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ map: tex.aA, normalMap: tex.aN, roughnessMap: tex.aR, roughness: 0.9, color: 0x504850 }));
+  const steel = geo.plumes.length || geo.embers.length ? createSteelworksFx(group, geo) : null;
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ map: tex.aA, normalMap: tex.aN, roughnessMap: tex.aR, roughness: 0.9, color: track.def?.look?.ground ?? 0x504850 }));
   tex.aA.repeat.set(1, 1); ground.position.set(geo.center[0], -0.08, geo.center[1]); ground.receiveShadow = true; ground.name = 'ground'; group.add(ground);
   const gmap = tex.aA.clone(); gmap.repeat.set(500, 500); gmap.needsUpdate = true; ground.material.map = gmap; ground.material.normalMap = tex.aN.clone(); ground.material.normalMap.repeat.set(500, 500); ground.material.roughnessMap = tex.aR.clone(); ground.material.roughnessMap.repeat.set(500, 500);
   [ground.material.normalMap, ground.material.roughnessMap].forEach((t) => { t.needsUpdate = true; owned.push(t); }); owned.push(gmap, ground.material, ground.geometry);
@@ -211,8 +219,9 @@ export function buildPbrTrack(track, opts = {}) {
   // holographic billboards (additive textured quads, double-sided)
   const bbMat = [];
   const bbMeshes = geo.billboards.map((b) => {
-    const [text, col] = BILLBOARDS[b.idx];
-    const t = dtex(holoBillboard(text, col, 128, 64, b.idx), 128, 64, { srgb: true, repeat: false, mip: false });
+    const [text, col] = geo.billboardSet[b.idx], bt = geo.billboardTex;
+    const t = dtex(holoBillboard(text, col, bt.w, bt.h, b.idx, bt.fit), bt.w, bt.h, { srgb: true, repeat: false, mip: false });
+    if (bt.fit) { t.repeat.y = -1; t.offset.y = 1; }   // the DataTexture is not flipped: row 0 is the top of the sign, so flip v for the kit's signs
     const m = new THREE.MeshBasicMaterial({ map: t, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, color: new THREE.Color(2.2, 2.2, 2.2) });
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(b.w, b.h), m); mesh.position.set(...b.pos); mesh.rotation.y = -b.yaw + Math.PI / 2; mesh.name = 'billboard'; mesh.userData.maxDist = 700; mesh.userData.base = b; mesh.renderOrder = 4;
     group.add(mesh); owned.push(t, m, mesh.geometry); bbMat.push(m); return mesh;
@@ -226,9 +235,10 @@ export function buildPbrTrack(track, opts = {}) {
   let time = 0, lightsOn = true;
   const api = {
     group, bounds: geo.bounds, stats: { ...geo.stats, meshes: meshes.length, billboards: bbMeshes.length, lamps: geo.lamps.length }, meshes, lights,
-    setQuality(q) { lightsOn = q.name !== 'low'; for (const l of lights) l.visible = lightsOn; mats.fog.opacity = q.name === 'low' ? 0 : 0.32; for (const f of fogMeshes) f.visible = q.name !== 'low'; },
+    setQuality(q) { if (steel) steel.setQuality(q); lightsOn = q.name !== 'low'; for (const l of lights) l.visible = lightsOn; mats.fog.opacity = q.name === 'low' ? 0 : 0.32; for (const f of fogMeshes) f.visible = q.name !== 'low'; },
     update(dt, camera, focus) {
       time += dt;
+      if (steel) steel.update(dt, camera, time);
       camera.getWorldPosition(cam);
       for (const m of [...meshes, pud, oil, tw, twg, ...bbMeshes, ...fogMeshes]) {
         if (!m) continue;
@@ -244,7 +254,7 @@ export function buildPbrTrack(track, opts = {}) {
       mats.fog.map.offset.x = (time * 0.01) % 1;
       bbMat.forEach((m, i) => { m.opacity = 0.85 + 0.15 * Math.sin(time * 3 + i); });
     },
-    dispose() { const g = new Set(); group.traverse((o) => { if (o.geometry) g.add(o.geometry); }); g.forEach((x) => x.dispose()); owned.forEach((o) => o.dispose && o.dispose()); },
+    dispose() { if (steel) steel.dispose(); const g = new Set(); group.traverse((o) => { if (o.geometry) g.add(o.geometry); }); g.forEach((x) => x.dispose()); owned.forEach((o) => o.dispose && o.dispose()); },
   };
   return api;
 }

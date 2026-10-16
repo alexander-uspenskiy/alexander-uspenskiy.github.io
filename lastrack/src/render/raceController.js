@@ -79,8 +79,8 @@ export function createRaceController(host, track, config = {}) {
   const prevFog = scene.fog, prevBg = scene.background;
   if (pbrMode) {
     // IBL (scene.environment, set by attachPBR) does the ambient; one shadow-casting key light follows the player; haze instead of palette fog
-    hemi = new THREE.HemisphereLight(0x8a6a8a, 0x1a1418, 0.25);
-    keyLight = makeKeyLight(host.pbr ? host.pbr.quality : { shadowMap: 1024, shadowSoft: false }, { intensity: pbrTrack ? (look.keyIntensity ?? 1.5) : 3.4, area: 22, color: pbrTrack ? (look.key ?? 0xffa27a) : 0xffb98a });
+    hemi = new THREE.HemisphereLight(look.hemi ?? 0x8a6a8a, look.hemiGround ?? 0x1a1418, 0.25);
+    keyLight = makeKeyLight(host.pbr ? host.pbr.quality : { shadowMap: 1024, shadowSoft: false }, { intensity: pbrTrack ? (look.keyIntensity ?? 1.5) : 3.4, area: 22, color: pbrTrack ? (look.key ?? 0xffa27a) : 0xffb98a, elev: look.sunElev });
     if (pbrTrack) { scene.backgroundIntensity = look.bgIntensity ?? 0.4; scene.environmentIntensity = 0.5 * (host.pbr ? host.pbr.quality.reflections : 1); }
     root.add(hemi, keyLight, keyLight.target); sun = keyLight;
     scene.fog = new THREE.FogExp2(pbrTrack ? (look.fog ?? 0x3a2640) : 0x5a3446, pbrTrack ? (look.fogDensity ?? 0.0052) : 0.0042);

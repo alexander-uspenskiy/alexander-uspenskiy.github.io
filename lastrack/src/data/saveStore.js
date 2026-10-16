@@ -9,6 +9,7 @@ import { TRACKS, SLICE_TRACKS } from './tracks/index.js';
 import { getPaint, getAccent, isNumberStr, PAINTS } from './liveries.js';
 import { normalizeSpikes, noSpikes } from './spikes.js';
 import { getDecal, normalizePlacements } from './decals.js';
+import { getPatron, CONTRACT_MAX_QUOTA } from './contracts.js';
 const ALL_TRACKS = [...TRACKS, ...SLICE_TRACKS];
 
 export const SAVE_KEY = 'lasttrack.save.v1';
@@ -42,7 +43,16 @@ export function defaultSave() {
     decals: [],
     // spikes (v0.4): tier 0..2 per set; older saves migrate to none
     spikes: noSpikes(),
+    // side contract (v0.5): the accepted bid { patron, quota }, settled after the next race; null = none
+    contract: null,
   };
+}
+
+/** A contract is { patron, quota } from a known patron; anything else (older saves, bad data) is dropped. */
+function normalizeContract(c) {
+  if (!isObj(c) || !getPatron(c.patron)) return null;
+  const quota = Math.floor(num(c.quota, 0));
+  return quota >= 1 && quota <= CONTRACT_MAX_QUOTA ? { patron: c.patron, quota } : null;
 }
 
 export function normalizeSave(input) {
@@ -88,6 +98,7 @@ export function normalizeSave(input) {
   if (Array.isArray(input.decalsOwned)) d.decalsOwned = [...new Set(input.decalsOwned.filter((id) => typeof id === 'string' && getDecal(id)))];
   d.spikes = normalizeSpikes(input.spikes);
   d.decals = normalizePlacements(input.decals, d.decalsOwned, PAINTS.map((p) => p.id));
+  d.contract = normalizeContract(input.contract);
   return d;
 }
 

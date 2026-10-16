@@ -1,4 +1,5 @@
-// Procedural HDR environments (equirect Float32 RGBA): 'dusk' dystopian-city sky for the race, 'showroom' studio with softboxes.
+// Procedural HDR environments (equirect Float32 RGBA): 'dusk' dystopian-city sky for the race, 'forge' smoke-and-furnace sky for
+// Foundry Run, 'showroom' studio with softboxes.
 // Node-safe data builders; envTextures() wraps + PMREM-filters them on a real renderer.
 import * as THREE from 'three';
 import { mulberry32 } from '../../core/mathUtil.js';
@@ -8,16 +9,25 @@ const mix3 = (a, b, t) => [mix(a[0], b[0], t), mix(a[1], b[1], t), mix(a[2], b[2
 const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
 export const SUN_ELEV = 0.13, SUN_AZ = 2.2;       // rad (sun low in the west)
-/** Direction (unit) the key light comes FROM, in world space for sunDir(). */
-export function sunDir() { const c = Math.cos(SUN_ELEV); return [Math.cos(SUN_AZ) * c, Math.sin(SUN_ELEV), Math.sin(SUN_AZ) * c]; }
+export const FORGE_SUN_ELEV = 0.16;               // Foundry Run's low sun; matches look.sunElev in data/tracks/testTrack.js
+/** Direction (unit) the key light comes FROM, in world space for sunDir(elev). */
+export function sunDir(elev = SUN_ELEV) { const c = Math.cos(elev); return [Math.cos(SUN_AZ) * c, Math.sin(elev), Math.sin(SUN_AZ) * c]; }
 
-/** Returns Float32Array RGBA (w*h*4) of HDR radiance. kind: 'dusk' | 'showroom'. */
+/** Returns Float32Array RGBA (w*h*4) of HDR radiance. kind: 'dusk' | 'forge' | 'showroom'. */
 export function buildEnvData(kind = 'dusk', w = 512, h = 256, seed = 4) {
   const data = new Float32Array(w * h * 4), r = mulberry32(seed);
   // skyline: per azimuth column building height (rad) + window pattern
   const cols = new Float32Array(w), neon = new Float32Array(w);
   for (let x = 0; x < w;) { const bw = 3 + ((r() * 9) | 0), bh = 0.02 + r() * r() * 0.16, ne = r() < 0.12 ? 1 : 0; for (let k = 0; k < bw && x < w; k++, x++) { cols[x] = bh; neon[x] = ne; } }
-  const sd = sunDir();
+  // dead-steelworks silhouettes (forge only; drawn after the skyline rng, so the other skies are unchanged): thin stacks with a
+  // warning light on top, and broad cooling towers
+  const stk = new Float32Array(w), stkTip = new Uint8Array(w);
+  if (kind === 'forge') for (let x = (r() * 20) | 0; x < w;) {
+    const tall = r() < 0.6, bw = tall ? 2 + ((r() * 3) | 0) : 14 + ((r() * 10) | 0), bh = tall ? 0.16 + r() * 0.3 : 0.08 + r() * 0.07;
+    for (let k = 0; k < bw && x < w; k++, x++) { stk[x] = bh; stkTip[x] = tall ? 1 : 0; }
+    x += 10 + ((r() * 46) | 0);
+  }
+  const sd = sunDir(kind === 'forge' ? FORGE_SUN_ELEV : SUN_ELEV);
   for (let y = 0; y < h; y++) {
     const lat = (0.5 - (y + 0.5) / h) * Math.PI;                                       // +pi/2 up
     for (let x = 0; x < w; x++) {
@@ -36,6 +46,17 @@ export function buildEnvData(kind = 'dusk', w = 512, h = 256, seed = 4) {
         strip(1.9, 0.12, 0.35, 0.55, 14, [0.75, 0.88, 1]); strip(-1.9, 0.12, 0.35, 0.55, 14, [1, 0.85, 0.7]);    // tall side strips
         strip(0, 0.5, 0.25, 0.06, 6, [0.4, 0.9, 1]); strip(Math.PI, 0.5, 0.25, 0.06, 6, [1, 0.3, 0.6]);          // coloured accent lines
         if (dy < 0) { const f = smooth(0, -1, dy); c = [c[0] * (1 - f * 0.7), c[1] * (1 - f * 0.7), c[2] * (1 - f * 0.7)]; }
+      } else if (kind === 'forge') {
+        // dead steelworks at dusk: smoke-brown sky, a furnace-orange band on the horizon, stacks in silhouette
+        const e = Math.max(0, lat);
+        const hor = [2.1, 0.6, 0.18], mid = [0.1, 0.04, 0.026], top = [0.018, 0.016, 0.02];
+        c = e < 0.2 ? mix3(hor, mid, smooth(0, 0.2, e)) : mix3(mid, top, smooth(0.2, 1, e));
+        const soot = 1 - 0.2 * smooth(0.05, 0.4, e) * (0.5 + 0.5 * Math.sin(lon * 6 + 2 * Math.sin(lat * 9)));   // sooty streaks up high
+        const cs = dx * sd[0] + dy * sd[1] + dz * sd[2], ang = Math.acos(Math.min(1, cs));
+        const sun = Math.exp(-ang * ang * 4000) * 60 + Math.exp(-ang * ang * 28) * 1.5 + Math.exp(-ang * 3.2) * 0.5;
+        c = [c[0] * soot + sun, c[1] * soot + sun * 0.5, c[2] * soot + sun * 0.18];
+        if (lat < 0) { const f = smooth(0, -0.4, lat); c = [mix(c[0] * 0.5, 0.05, f), mix(c[1] * 0.4, 0.03, f), mix(c[2] * 0.4, 0.024, f)]; }
+        if (lat < stk[x] && lat >= 0) c = stkTip[x] && Math.abs(lat - stk[x]) < 0.014 ? [6, 1.6, 0.4] : [0.012, 0.01, 0.011];   // warning lights on the stack tops
       } else {
         // dusk: warm horizon -> violet -> deep blue; low sun; dystopian skyline with neon; wet dark ground
         const e = Math.max(0, lat);

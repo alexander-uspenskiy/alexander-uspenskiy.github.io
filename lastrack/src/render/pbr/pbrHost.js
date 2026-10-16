@@ -5,13 +5,15 @@ import { makeEnvTextures, sunDir } from './env.js';
 import { resolveQuality, DEFAULT_QUALITY } from './quality.js';
 
 /** Directional key light configured for the quality; call followShadow() each frame with the focus point. */
-export function makeKeyLight(q, { intensity = 3.2, color = 0xffb98a, area = 14 } = {}) {
+export function makeKeyLight(q, { intensity = 3.2, color = 0xffb98a, area = 14, elev = null } = {}) {
   const l = new THREE.DirectionalLight(color, intensity);
   l.castShadow = true;
   l.shadow.mapSize.set(q.shadowMap, q.shadowMap);
   const c = l.shadow.camera; c.left = -area; c.right = area; c.top = area; c.bottom = -area; c.near = 1; c.far = 120;
   l.shadow.bias = -0.0004; l.shadow.normalBias = 0.03; l.shadow.radius = q.shadowSoft ? 3 : 1;
-  const d = sunDir(); l.userData.dir = new THREE.Vector3(d[0], Math.max(0.35, d[1] * 2.6), d[2]).normalize();
+  // default: a fixed, fairly high key; elev: a true sun at that elevation (rad), for long shadows
+  if (elev == null) { const d = sunDir(); l.userData.dir = new THREE.Vector3(d[0], Math.max(0.35, d[1] * 2.6), d[2]).normalize(); }
+  else l.userData.dir = new THREE.Vector3(...sunDir(elev));
   l.position.copy(l.userData.dir).multiplyScalar(50);
   return l;
 }

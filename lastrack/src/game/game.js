@@ -28,7 +28,7 @@ import { createAnalytics } from '../analytics.js';
 import { attachAnalytics } from '../analyticsWiring.js';
 import { VERSION } from '../version.js';
 import { createOverlays } from '../ui/overlays.js';
-import { h } from '../ui/dom.js';
+import { h, fmtMoney } from '../ui/dom.js';
 import { createTitleScreen } from '../ui/screens/title.js';
 import { createCarSelectScreen } from '../ui/screens/carSelect.js';
 import { createGarageScreen } from '../ui/screens/garage.js';
@@ -51,6 +51,7 @@ const ERRORS = {
   'insufficient-cash': 'Not enough cash.', 'max-level': 'Already maxed.', 'already-owned': 'You already own that.',
   'no-slots': 'No free weapon slots on this car.', 'ammo-full': 'Ammo is full.', 'not-owned': 'You do not own that.',
   'nothing-to-repair': 'Nothing to repair.', 'decal-limit': 'Six decals per car — remove one first.',
+  'contract-active': 'One contract at a time. Race it first.', 'unknown-patron': 'No one is offering that.',
 };
 const inRaceState = (s) => s === 'race' || s === 'paused';
 const MENU_3D = new Set(['title', 'carSelect', 'garage', 'shop', 'paint']);   // states drawn over the live 3D showroom
@@ -87,6 +88,8 @@ export function createGame({ root, canvas, storage, onError = () => {}, quality 
   let pbr = null, envKind = 'showroom';
   if (host) { try { pbr = attachPBR(host, { quality: quality || readQuality(typeof location !== 'undefined' ? location.search : '', typeof localStorage !== 'undefined' ? localStorage : null), env: envKind }); } catch (e) { reportError(e); } }
   const setEnv = (k) => { if (pbr && envKind !== k) { envKind = k; try { pbr.setEnv(k); } catch (e) { reportError(e); } } };
+  // each race gets its track's sky (look.env, e.g. Foundry Run's furnace sky); the city dusk otherwise
+  const raceEnv = () => (getTrack(raceSetup.trackId) || {}).look?.env || 'dusk';
   // player settings live in real localStorage even when the save is in-memory (?fresh=1 / slice)
   const settingsStorage = getDefaultStorage();
   let settings = loadSettings(settingsStorage);
@@ -97,7 +100,7 @@ export function createGame({ root, canvas, storage, onError = () => {}, quality 
   try { audio = safe(createAudioEngine(), reportError); } catch (e) { reportError(e); }
 
   const flow = createFlowMachine({ initial: 'title' });
-  let raceSetup = { trackId: SLICE_TRACK_ID, laps: 3, mode: 'race', practiceRivals: false };
+  let raceSetup = { trackId: SLICE_TRACK_ID, laps: 3, mode: 'race', practiceRivals: false, bid: null };   // bid: patron id the wizard offered, taken at START
   let sim = null, controller = null, track = null, config = null;
   let snapA = null, snapB = null, acc = 0, endTimer = 0, wreckTimer = 0, finalized = false;
   let lastResult = null;
@@ -126,7 +129,7 @@ export function createGame({ root, canvas, storage, onError = () => {}, quality 
     getSave: () => saveData,
     setSave: (s) => commit(s),
     hasSavedGame: () => store.exists(),
-    newGame() { saveData = store.reset(); bus.emit('game:new'); raceSetup = { ...raceSetup, trackId: SLICE_TRACK_ID, laps: 3, mode: 'race' }; return saveData; },
+    newGame() { saveData = store.reset(); bus.emit('game:new'); raceSetup = { ...raceSetup, trackId: SLICE_TRACK_ID, laps: 3, mode: 'race', bid: null }; return saveData; },
     chooseCar(carId) {
       const r = economy.chooseCar(saveData, carId);
       if (!r.ok) throw new Error('chooseCar: ' + r.error);
@@ -147,12 +150,20 @@ export function createGame({ root, canvas, storage, onError = () => {}, quality 
       bus.emit('purchase', { kind, id, cost: r.cost || 0, balance: saveData.cash, level: (kind === 'upgrade' ? saveData.upgrades[id] : kind === 'spikes' ? saveData.spikes[id] : 0) });
       return { ok: true };
     },
+    /** acceptContract(patronId) -> {ok, error?}: lock in a board bid; it settles after the next race. */
+    acceptContract(patronId) {
+      const r = economy.acceptContract(saveData, patronId);
+      if (!r.ok) return { ok: false, error: ERRORS[r.error] || r.error };
+      commit(r.save);
+      bus.emit('contract:accepted', { patron: r.save.contract.patron, quota: r.save.contract.quota });
+      return { ok: true };
+    },
     /** Quick start (debug / `?slice=1` alias): fresh save with the Hammer, straight into a race on the first track. */
     startSlice() {
       saveData = store.reset();
       const r = economy.chooseCar(saveData, 'hammer');
       if (r.ok) saveData = r.save;
-      raceSetup = { trackId: SLICE_TRACK_ID, laps: 3, mode: 'race', practiceRivals: false };
+      raceSetup = { trackId: SLICE_TRACK_ID, laps: 3, mode: 'race', practiceRivals: false, bid: null };
       return flow.force('loading');
     },
     /** The player's resolved livery for a car (default: the saved car). Used by every 3D preview. */
@@ -274,7 +285,8 @@ export function createGame({ root, canvas, storage, onError = () => {}, quality 
       try { host.resize(canvas.clientWidth || window.innerWidth, canvas.clientHeight || window.innerHeight); } catch (e) { reportError(e); }
     }
     const names = snapA.cars.map((c) => c.name);
-    hud.begin({ createMinimap, track, names, hero: !!config.hero, carId: (config.player && config.player.carId) || saveData.carId });
+    hud.begin({ createMinimap, track, names, hero: !!config.hero, carId: (config.player && config.player.carId) || saveData.carId,
+      contract: config.mode === 'race' ? saveData.contract : null });
     audio?.resume();
     audio?.startRace();
     bus.emit('race:created', { config });
@@ -289,16 +301,20 @@ export function createGame({ root, canvas, storage, onError = () => {}, quality 
     const result = sim.result();
     const before = saveData;
     const applied = economy.applyRaceResult(saveData, result, { mode: config.mode, nCars: result.finishOrder.length });
+    const contract = economy.settleContract(applied.save, { mode: config.mode, kills: result.player.kills });
     const p = result.player;
     const summary = {
       mode: config.mode, position: p.position, time: p.time, kills: p.kills, wrecked: !!p.wrecked,
       prize: applied.prize, killBonus: applied.killBonus, total: applied.total,
       unlocked: applied.unlockedTrack, damageFraction: p.damageFraction,
       newBest: config.mode === 'race' && p.time != null && (before.bestTimes[result.trackId] == null || p.time < before.bestTimes[result.trackId]),
+      contract: contract.settled, contractNet: contract.settled ? contract.settled.net : 0,
+      contractOpen: config.mode === 'practice' && !!before.contract,
     };
     const pickupCash = config.mode === 'race' ? Math.max(0, Math.round(p.pickupCash || 0)) : 0;
     summary.pickupCash = pickupCash;
-    if (config.mode === 'race') commit({ ...applied.save, cash: applied.save.cash + pickupCash });
+    if (config.mode === 'race') commit({ ...contract.save, cash: contract.save.cash + pickupCash });
+    if (contract.settled) bus.emit('contract:settled', contract.settled);
     lastResult = { result, summary };
     bus.emit('race:finished', lastResult);
     if (!flow.transition('results', lastResult)) flow.force('results', lastResult);
@@ -307,7 +323,20 @@ export function createGame({ root, canvas, storage, onError = () => {}, quality 
   function pause() { if (flow.state !== 'race') return false; return flow.transition('paused'); }
   function resume() { if (flow.state !== 'paused') return false; return flow.transition('race'); }
   function restartRace() { return flow.state === 'paused' ? flow.transition('loading') : flow.force('loading'); }
-  function quitRace() { return flow.state === 'paused' ? flow.transition('garage') : flow.force('garage'); }
+  /** Leaving a race early is not finishing it: an open contract settles on the kills so far (complete, or the penalty). */
+  function abandonRace() {
+    if (!config || config.mode !== 'race' || !saveData.contract) return undefined;
+    const r = economy.settleContract(saveData, { mode: 'race', kills: snapB?.cars?.[0]?.kills ?? 0 });
+    commit(r.save);
+    bus.emit('contract:settled', r.settled);
+    return r.settled.complete
+      ? { notice: `Contract done. Bounty ${fmtMoney(r.settled.bounty)} paid.`, noticeBad: false }
+      : { notice: `Contract failed. ${fmtMoney(r.settled.penalty)} taken.`, noticeBad: true };
+  }
+  function quitRace() {
+    const params = abandonRace();
+    return flow.state === 'paused' ? flow.transition('garage', params) : flow.force('garage', params);
+  }
 
   // ---------- flow wiring ----------
   const sceneFor = (to, params) => (to === 'race' || to === 'paused' ? 'race'
@@ -329,7 +358,7 @@ export function createGame({ root, canvas, storage, onError = () => {}, quality 
       }
       const menu3d = !!stage && MENU_3D.has(to);
       if (stage) { if (menu3d) { setEnv('showroom'); stage.show(); } else stage.hide(); }
-      if (to === 'loading' || inRaceState(to)) setEnv('dusk');
+      if (to === 'loading' || inRaceState(to)) setEnv(raceEnv());
       if (to === 'title') document.body.classList.remove('racing');
       document.body.classList.toggle('racing', inRaceState(to));
       document.body.classList.toggle('scene3d', menu3d);

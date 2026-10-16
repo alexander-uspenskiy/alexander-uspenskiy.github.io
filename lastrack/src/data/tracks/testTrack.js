@@ -28,7 +28,12 @@ export const FOUNDRY_RUN = {
   blurb: 'Left-handers through a dead steelworks. Hot light, long shadows, a hairpin that bites.',
   laps: 3, prize: 6000, width: 16,
   theme: { ground: 5, road: 0, curb: [9, 7], sky: [9, 2], scenery: 'junk' },
-  look: { fog: 0x3c2218, fogDensity: 0.0056, key: 0xff8a4a, keyIntensity: 1.7, bgIntensity: 0.32, seed: 191 },
+  look: {
+    kit: 'steelworks', env: 'forge', seed: 191,       // prop kit (render/pbr/steelworks.js) and sky (render/pbr/env.js)
+    fog: 0x5a2e1c, fogDensity: 0.0065, key: 0xff8a4a, keyIntensity: 1.7, bgIntensity: 0.32,
+    sunElev: 0.16,                                    // low sun for long shadows; = FORGE_SUN_ELEV in render/pbr/env.js
+    hemi: 0x7a4a32, hemiGround: 0x2a1812, ground: 0x4a3a33,
+  },
   control: RAW.map(([x, y]) => [y * 1.12, x * 1.12]),
   pickups: [{ s: 0.15, type: 'ammo' }, { s: 0.4, type: 'repair' }, { s: 0.65, type: 'cash' }, { s: 0.85, type: 'ammo' }],
   surfaces: {

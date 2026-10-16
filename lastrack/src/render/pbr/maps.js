@@ -118,13 +118,14 @@ export function concreteMaps(size = 128, seed = 21) {
 }
 
 /** Holographic billboard (RGBA, alpha = glow mask): frame, big pixel text, scanlines. */
-export function holoBillboard(text, color = [60, 230, 255], w = 128, h = 64, seed = 5) {
+export function holoBillboard(text, color = [60, 230, 255], w = 128, h = 64, seed = 5, fit = false) {
   const out = new Uint8Array(w * h * 4), r = mulberry32(seed);
   const set = (x, y, a, k = 1) => { if (x < 0 || y < 0 || x >= w || y >= h) return; const i = (y * w + x) * 4; out[i] = color[0] * k; out[i + 1] = color[1] * k; out[i + 2] = color[2] * k; out[i + 3] = Math.max(out[i + 3], a); };
   for (let x = 0; x < w; x++) { set(x, 0, 255); set(x, h - 1, 255); set(x, 1, 120); set(x, h - 2, 120); }
   for (let y = 0; y < h; y++) { set(0, y, 255); set(w - 1, y, 255); set(1, y, 120); set(w - 2, y, 120); }
   const glyph = { A: '010101111101101', B: '110101110101110', C: '011100100100011', D: '110101101101110', E: '111100110100111', F: '111100110100100', G: '011100101101011', H: '101101111101101', I: '111010010010111', K: '101101110101101', L: '100100100100111', M: '101111111101101', N: '101111111111101', O: '010101101101010', P: '110101110100100', R: '110101110101101', S: '011100010001110', T: '111010010010010', U: '101101101101111', Y: '101101010010010', 0: '111101101101111', 1: '010110010010111', 2: '111001111100111', 3: '111001111001111', 7: '111001010010010', 9: '111101111001111', ' ': '000000000000000', '-': '000000111000000' };
-  const s = Math.max(2, Math.floor((h - 16) / 5)), tw = text.length * 4 * s - s, x0 = Math.floor((w - tw) / 2), y0 = Math.floor((h - 5 * s) / 2);
+  // fit: shrink the glyphs so the whole text fits the width (default keeps the height-driven size)
+  const sH = Math.max(2, Math.floor((h - 16) / 5)), s = fit ? Math.max(2, Math.min(sH, Math.floor((w - 16) / (4 * text.length)))) : sH, tw = text.length * 4 * s - s, x0 = Math.floor((w - tw) / 2), y0 = Math.floor((h - 5 * s) / 2);
   for (let c = 0; c < text.length; c++) { const g = glyph[text[c].toUpperCase()] || glyph[' ']; for (let i = 0; i < 15; i++) if (g[i] === '1') for (let yy = 0; yy < s; yy++) for (let xx = 0; xx < s; xx++) set(x0 + c * 4 * s + (i % 3) * s + xx, y0 + ((i / 3) | 0) * s + yy, 255, 1.0); }
   for (let y = 0; y < h; y += 2) for (let x = 0; x < w; x++) { const i = (y * w + x) * 4; out[i + 3] = out[i + 3] * 0.65; }          // scanlines
   for (let k = 0; k < 40; k++) set((r() * w) | 0, (r() * h) | 0, 90, 0.7);                                                           // sparkle noise
