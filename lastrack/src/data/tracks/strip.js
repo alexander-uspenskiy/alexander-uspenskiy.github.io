@@ -1,0 +1,2 @@
+export const STRIP = { id:'strip', name:'Vegas Strip', city:'Las Vegas', blurb:'Neon, cash and a kilometre of flat-out tarmac. Missiles fly as fast as the cars.', laps:3, prize:6000, width:16,
+  theme:{ ground:5, road:0, curb:[8,7], sky:[12,1], scenery:'neon' }, control:[[0,0],[300,0],[600,0],[900,-10],[1050,40],[1100,140],[1050,240],[900,290],[600,280],[450,330],[300,300],[150,280],[0,290],[-120,240],[-150,140],[-120,40]], pickups:[{ s: 0.1, type: 'ammo' }, { s: 0.3, type: 'cash' }, { s: 0.5, type: 'repair' }, { s: 0.7, type: 'ammo' }, { s: 0.88, type: 'cash' }] };

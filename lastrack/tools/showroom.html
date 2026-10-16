@@ -1,0 +1,93 @@
+<!doctype html><meta charset="utf-8"><title>Hammer showroom</title>
+<script type="importmap">{"imports":{"three":"../vendor/three.module.js"}}</script>
+<style>
+html,body{margin:0;height:100%;background:#05060a;color:#cfe;font:12px/1.4 ui-monospace,Menlo,monospace;overflow:hidden}
+canvas{display:block;width:100vw;height:100vh}
+#ui{position:fixed;left:10px;top:10px;background:rgba(5,10,16,.72);border:1px solid #1d5a6a;padding:8px 10px;border-radius:6px;backdrop-filter:blur(4px);max-width:260px}
+#ui h1{font-size:13px;margin:0 0 6px;color:#35e6ff;letter-spacing:.14em}
+#ui label{display:flex;justify-content:space-between;gap:8px;margin:3px 0;align-items:center}
+#ui button,#ui select{background:#0b2530;color:#cfe;border:1px solid #1d5a6a;border-radius:3px;padding:2px 6px;font:inherit;cursor:pointer}
+#ui button:hover{background:#12475a}#stats{margin-top:6px;color:#9fd;white-space:pre}
+.row{display:flex;flex-wrap:wrap;gap:3px;margin:4px 0}
+</style>
+<canvas id="c"></canvas>
+<div id="ui"><h1>HAMMER · SHOWROOM</h1>
+<label>quality <select id="q"><option>low</option><option selected>med</option><option>high</option></select></label>
+<label>environment <select id="env"><option value="showroom">studio</option><option value="dusk">dusk city</option></select></label>
+<div class="row" id="stages"></div>
+<label>wet <input id="wet" type="range" min="0" max="1" step="0.05" value="0"></label>
+<label>dirt <input id="dirt" type="range" min="0" max="1" step="0.05" value="0"></label>
+<label>steer <input id="steer" type="range" min="-1" max="1" step="0.05" value="0"></label>
+<div class="row"><button id="brake">brake</button><button id="fire">fire gun</button><button id="gas">throttle</button><button id="spin">turntable</button></div>
+<div class="row" id="views"></div>
+<div id="stats"></div></div>
+<script type="module">
+// Showroom for the PBR hero Hammer. URL: ?q=low|med|high &view=q34|side|front|rear|top|wheel &stage=0..4 &wet=0..1 &dirt=0..1 &env=showroom|dusk &spin=0|1 &brake=1 &fire=1 &gas=1
+import * as THREE from 'three';
+import { createRenderHost } from '../src/render/renderHost.js';
+import { attachPBR, makeKeyLight, followShadow } from '../src/render/pbr/pbrHost.js';
+import { buildHeroCarPBR } from '../src/render/pbr/heroCarPBR.js';
+import { readQuality } from '../src/render/pbr/quality.js';
+const Q = new URLSearchParams(location.search), $ = (id) => document.getElementById(id);
+const host = createRenderHost($('c'), { palettePass: false, fov: 34 });
+const qn = readQuality(location.search, localStorage); $('q').value = qn;
+const pbr = attachPBR(host, { quality: qn, env: Q.get('env') || 'showroom', background: false }); host.scene.background = new THREE.Color(0x06080c); $('env').value = Q.get('env') || 'showroom';
+const scene = host.scene, cam = host.camera; cam.near = 0.1; cam.far = 300; cam.updateProjectionMatrix();
+const key = makeKeyLight(pbr.quality, { intensity: 2.2, color: 0xfff0e0, area: 9 }); key.userData.dir.set(0.35, 0.9, 0.45).normalize(); scene.add(key, key.target);
+const rim = new THREE.DirectionalLight(0x35e6ff, 1.4); rim.position.set(-6, 3, -5); scene.add(rim);
+const fill = new THREE.DirectionalLight(0xff4aa0, 0.5); fill.position.set(6, 2, -4); scene.add(fill);
+// glossy dark floor with a soft pool of light
+const fc = document.createElement('canvas'); fc.width = fc.height = 256; const g = fc.getContext('2d'); const gr = g.createRadialGradient(128, 128, 10, 128, 128, 128);
+gr.addColorStop(0, '#3a4048'); gr.addColorStop(0.55, '#1a1e24'); gr.addColorStop(1, '#07080b'); g.fillStyle = gr; g.fillRect(0, 0, 256, 256);
+const ft = new THREE.CanvasTexture(fc); ft.colorSpace = THREE.SRGBColorSpace;
+const floor = new THREE.Mesh(new THREE.CircleGeometry(40, 64).rotateX(-Math.PI / 2), new THREE.MeshPhysicalMaterial({ map: ft, metalness: 0.7, roughness: 0.22, clearcoat: 0.5, envMapIntensity: 0.8 }));
+floor.receiveShadow = true; scene.add(floor);
+const car = buildHeroCarPBR({ color: new THREE.Color(Q.get('paint') ? '#' + Q.get('paint') : '#c8501a').getHex() }); scene.add(car);
+car.traverse((o) => { if (o.isMesh && ['glass', 'gaps', 'interior', 'displays', 'underglow-decal'].includes(o.name)) o.castShadow = false; });
+const hero = car.userData.hero;
+const st = { speed: 0, steer: +(Q.get('steer') || 0), ax: 0, ay: 0, throttle: 0, braking: 0, frac: 1, dmg: [0, 0, 0, 0], wrecked: false, firing: false, aim: 0.25, wet: +(Q.get('wet') || 0), dirt: +(Q.get('dirt') || 0) };
+let stage = +(Q.get('stage') || 0), spin = Q.get('spin') !== '0', yaw = 0.6, camYaw = 0.55, camPitch = 0.16, camDist = 8.2, view = Q.get('view') || 'q34', t = 0;
+function setStage(s) { stage = s; const m = [[1, 0], [0.55, 0.35], [0.25, 0.75], [0.1, 1], [0, 1]][s]; st.frac = m[0]; st.dmg = [m[1], m[1] * 0.45, m[1] * 0.7, m[1] * 0.3]; st.wrecked = s === 4; }
+setStage(stage);
+const stages = $('stages'); for (let i = 0; i < 5; i++) { const b = document.createElement('button'); b.textContent = ['pristine', 'dented', 'smoking', 'fire', 'wreck'][i]; b.onclick = () => setStage(i); stages.append(b); }
+const VIEWS = { under: [0.55, -0.5, 5.2, 0.5, 0.4], low: [0.7, -0.02, 6.2, 0.5, 0.45],  q34: [0.55, 0.16, 8.2, 1.0, 0.7], side: [0.0, 0.05, 8.5, 1.0, 0.6], front: [Math.PI / 2, 0.1, 7.5, 1.0, 0.7], rear: [-Math.PI / 2, 0.12, 7.5, 1.0, 0.8], top: [0.4, 1.4, 10, 1.0, 0.0], wheel: [0.35, 0.05, 3.2, 1.55, 0.45] };
+function setView(v) { view = v; const p = VIEWS[v] || VIEWS.q34; camYaw = p[0]; camPitch = p[1]; camDist = p[2]; focus.set(p[3] === 1.55 ? 1.55 : 0, p[4], p[3] === 1.55 ? 1.0 : 0); }
+const focus = new THREE.Vector3(0, 0.7, 0); const views = $('views'); for (const v of Object.keys(VIEWS)) { const b = document.createElement('button'); b.textContent = v; b.onclick = () => { setView(v); spin = false; }; views.append(b); }
+setView(view);
+let drag = null; $('c').onpointerdown = (e) => { drag = [e.clientX, e.clientY]; spin = false; }; addEventListener('pointerup', () => (drag = null));
+addEventListener('pointermove', (e) => { if (!drag) return; camYaw -= (e.clientX - drag[0]) * 0.006; camPitch = Math.max(0.02, Math.min(1.4, camPitch + (e.clientY - drag[1]) * 0.004)); drag = [e.clientX, e.clientY]; });
+addEventListener('wheel', (e) => { camDist = Math.max(2.5, Math.min(18, camDist + e.deltaY * 0.01)); });
+$('q').onchange = () => pbr.setQuality($('q').value); $('env').onchange = () => { pbr.setEnv($('env').value); scene.background = $('env').value === 'dusk' ? pbr.envBackground : new THREE.Color(0x06080c); };
+$('wet').oninput = () => (st.wet = +$('wet').value); $('dirt').oninput = () => (st.dirt = +$('dirt').value); $('steer').oninput = () => (st.steer = +$('steer').value);
+const toggle = (id, key2, on, off) => { const b = $(id); let v = false; const set = (x) => { v = x; b.style.background = v ? '#12475a' : ''; on(v); }; b.onclick = () => set(!v); if (Q.get(key2) === '1') set(true); };
+toggle('brake', 'brake', (v) => { st.braking = v ? 1 : 0; st.ax = v ? -12 : 0; st.speed = v ? 30 : 0; });
+toggle('fire', 'fire', (v) => (st.firing = v));
+toggle('gas', 'gas', (v) => { st.throttle = v ? 1 : 0; st.ax = v ? 6 : 0; st.speed = v ? 25 : 0; });
+$('spin').onclick = () => (spin = !spin);
+const stats = $('stats'); let frames = 0, acc = 0, fps = 0, prev = performance.now();
+function resize() { host.resize(innerWidth, innerHeight); } addEventListener('resize', resize); resize();
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = Math.min(0.05, (now - prev) / 1000); prev = now; t += dt; acc += dt; frames++;
+  if (acc > 0.5) { fps = frames / acc; frames = 0; acc = 0; }
+  if (spin) yaw += dt * 0.35; car.rotation.y = -yaw * (spin ? 1 : 0) - 0.0;
+  st.ay = st.steer * 10; hero.update(st, dt, { far: false });
+  const cx = Math.cos(camPitch), target = focus.clone();
+  const a = camYaw + (spin ? 0 : 0);
+  cam.position.set(target.x + Math.sin(a) * cx * camDist, target.y + Math.sin(camPitch) * camDist, target.z + Math.cos(a) * cx * camDist); cam.lookAt(target);
+  followShadow(key, 0, 0, 0); host.render();
+  stats.textContent = `${pbr.qualityName.toUpperCase()}  ${fps.toFixed(0)} fps  ${pbr.stats.ms.toFixed(1)} ms (cpu submit)\ndraw calls ${pbr.stats.calls}  tris ${(pbr.stats.tris / 1000).toFixed(1)}k  passes ${pbr.stats.passes}\ncar mesh tris ${(car.userData.triCount() / 1000).toFixed(1)}k  stage ${hero.stage}`;
+  window.__stats = { fps, calls: pbr.stats.calls, tris: pbr.stats.tris, passes: pbr.stats.passes, stage: hero.stage, q: pbr.qualityName };
+}
+requestAnimationFrame(frame);
+const raf2 = () => new Promise((r) => { const t = setTimeout(r, 400); requestAnimationFrame(() => requestAnimationFrame(() => { clearTimeout(t); r(); })); });
+/** capture(view, filename?) -> PNG data URL of the canvas for that view (render + read in the same task). Optional POST to /save/<filename> (dev server). */
+async function capture(v, name) {
+  setView(v); spin = false; await raf2();
+  const cx = Math.cos(camPitch), a = camYaw; cam.position.set(focus.x + Math.sin(a) * cx * camDist, focus.y + Math.sin(camPitch) * camDist, focus.z + Math.cos(a) * cx * camDist); cam.lookAt(focus); hero.update(st, 0.016); followShadow(key, 0, 0, 0);
+  host.render(); const url = $('c').toDataURL('image/png');
+  if (name) await fetch('/save/' + name, { method: 'POST', body: url });
+  return url.length;
+}
+window.__showroom = { host, pbr, car, hero, st, setStage, setView, capture, THREE };
+</script>
