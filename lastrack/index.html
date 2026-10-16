@@ -13,6 +13,17 @@
   <meta name="description" content="Last Track — a browser vehicular-combat racer. Race rivals for money, buy armor and weapons, survive 10 tracks.">
   <link rel="stylesheet" href="./styles.css">
   <link rel="stylesheet" href="./hud.css">
+  <!-- Google Analytics (GA4); disabled on localhost so dev runs don't pollute stats -->
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag() { dataLayer.push(arguments); }
+    if (!/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) {
+      var gs = document.createElement('script'); gs.async = true; gs.src = 'https://www.googletagmanager.com/gtag/js?id=G-26LK8EK35B';
+      document.head.appendChild(gs);
+      gtag('js', new Date());
+      gtag('config', 'G-26LK8EK35B', { page_title: 'Last Track' });
+    }
+  </script>
   <script type="importmap">{"imports":{"three":"./vendor/three.module.js"}}</script>
 </head>
 <body>
